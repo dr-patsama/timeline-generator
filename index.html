@@ -105,6 +105,14 @@
             background: #a0a0a0;
         }
 
+        @keyframes slideUp {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+
         /* The hidden container that holds the printable version of the timeline. */
         #print-container {
             position: absolute;
@@ -154,6 +162,34 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, useContext, createContext } = React;
+
+        // Error Boundary to catch and display runtime errors
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null, errorInfo: null };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            componentDidCatch(error, errorInfo) {
+                this.setState({ errorInfo });
+                console.error('ErrorBoundary caught:', error, errorInfo);
+                alert('ERROR: ' + error.toString() + '\n\nComponent: ' + (errorInfo && errorInfo.componentStack ? errorInfo.componentStack.split('\n').slice(0,3).join('\n') : ''));
+            }
+            render() {
+                if (this.state.hasError) {
+                    return React.createElement('div', { style: { padding: '40px', fontFamily: 'monospace', background: '#fee2e2', margin: '20px', borderRadius: '12px' } },
+                        React.createElement('h2', { style: { color: '#991b1b' } }, 'Something went wrong'),
+                        React.createElement('pre', { style: { whiteSpace: 'pre-wrap', color: '#7f1d1d', fontSize: '14px' } },
+                            this.state.error && this.state.error.toString()),
+                        React.createElement('pre', { style: { whiteSpace: 'pre-wrap', color: '#991b1b', fontSize: '12px', marginTop: '10px' } },
+                            this.state.errorInfo && this.state.errorInfo.componentStack)
+                    );
+                }
+                return this.props.children;
+            }
+        }
 
         // ==========================================
         // PART 1: HELPERS
@@ -330,7 +366,8 @@
                 progesteroneStartDayLabel: 'Progesterone Start Day (Cycle Day):',
                 saveProject: 'Save Project',
                 loadProject: 'Open Timeline to Edit',
-                saveSuccess: 'Project saved successfully!',
+                saveSuccess: 'Saved successfully!',
+                saveDownloaded: 'Downloaded',
                 loadError: 'Error loading file. Please check the format.',
                 savedCases: 'Saved Cases (Local)',
                 dateGenerated: 'Date Generated',
@@ -476,7 +513,8 @@
                 progesteroneStartDayLabel: 'วันที่เริ่มยาโปรเจสเตอโรน (วันที่ของรอบ):',
                 saveProject: 'บันทึกโปรเจกต์',
                 loadProject: 'เปิดไทม์ไลน์เพื่อแก้ไข',
-                saveSuccess: 'บันทึกโปรเจกต์เรียบร้อยแล้ว!',
+                saveSuccess: 'บันทึกเรียบร้อยแล้ว!',
+                saveDownloaded: 'ดาวน์โหลดแล้ว',
                 loadError: 'เกิดข้อผิดพลาดในการโหลดไฟล์ กรุณาตรวจสอบรูปแบบไฟล์',
                 savedCases: 'เคสที่บันทึกไว้ (ในเครื่อง)',
                 dateGenerated: 'วันที่สร้าง',
@@ -603,6 +641,12 @@
             });
             const [edits, setEdits] = useState({});
             const [savedCases, setSavedCases] = useState([]);
+            const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
+
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 4000);
+            };
 
             const loadSavedCases = async () => {
                 try {
@@ -685,12 +729,14 @@
                 if (!filename) filename = 'timeline-project';
 
                 try {
-                    await fetch('http://localhost:8012/api/save', {
+                    const res = await fetch('http://localhost:8012/api/save', {
                         method: 'POST',
                         body: JSON.stringify({ type: 'json', filename: filename, content: data }),
                         headers: { 'Content-Type': 'application/json' }
                     });
-                    // Fallback to downloading if the server fails is an option, but we requested automation.
+                    const result = await res.json().catch(() => ({}));
+                    const savedPath = result.path || `Timeline-Generator-Output/${filename}.json`;
+                    showToast(`${t.saveSuccess}\n📁 ${savedPath}`, 'success');
                 } catch (e) {
                     console.log('Local server not running, falling back to manual download', e);
                     const blob = new Blob([json], { type: 'application/json' });
@@ -702,6 +748,7 @@
                     link.click();
                     document.body.removeChild(link);
                     URL.revokeObjectURL(url);
+                    showToast(`${t.saveSuccess}\n📥 ${t.saveDownloaded}: ${filename}.json`);
                 }
             };
 
@@ -858,6 +905,9 @@
                         preventionMedication: '',
                         preventionStartDayType: 'cycleDay',
                         preventionStartDay: '6',
+                        lutealLhStrategy: 'antagonist',
+                        lutealProgestinMedication: '',
+                        day1Reference: 'menses',
                     };
                     setTimelineInputs(next);
                     return;
@@ -982,6 +1032,8 @@
                             setEdits={setEdits}
                             onBack={() => setCurrentView(`${type}Input`)}
                             onSave={handleSaveFile}
+                            onReset={resetAll}
+                            onBackToMenu={() => setCurrentView('mainMenu')}
                         />
                     );
                 }
@@ -1002,6 +1054,25 @@
                         <main className="w-full max-w-5xl bg-white p-6 rounded-xl shadow-lg">
                             {renderContent()}
                         </main>
+                        {toast && (
+                            <div
+                                className={`fixed bottom-6 right-6 z-50 max-w-sm px-5 py-4 rounded-xl shadow-2xl text-white text-sm font-medium transition-all duration-300 animate-slide-up ${
+                                    toast.type === 'error'
+                                        ? 'bg-red-500'
+                                        : 'bg-gradient-to-r from-green-500 to-emerald-600'
+                                }`}
+                                style={{ whiteSpace: 'pre-line' }}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <span className="text-lg">{toast.type === 'error' ? '❌' : '✅'}</span>
+                                    <span className="flex-1">{toast.message}</span>
+                                    <button
+                                        onClick={() => setToast(null)}
+                                        className="text-white/70 hover:text-white text-lg leading-none ml-2"
+                                    >×</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </LanguageContext.Provider>
             );
@@ -1300,7 +1371,7 @@
         }
 
         function InputForm({ type, patientData, onPatientChange, inputs, onInputChange, setBool, errorMessage, onBackToMenu, onReset, onSave, onGo }) {
-            const { t } = useLanguage();
+            const { t, language } = useLanguage();
             return (
                 <div className="space-y-6">
                     <div className="flex justify-between items-center border-b pb-4">
@@ -1404,8 +1475,20 @@
                                         name="protocol"
                                         value={inputs.protocol || ''}
                                         onChange={onInputChange}
-                                        options={['Antagonist', 'PPOS', 'Mild stimulation', 'Natural cycle'].map((v) => ({ value: v, label: v }))}
+                                        options={['Antagonist', 'PPOS', 'Mild stimulation', 'Natural cycle', 'Luteal stimulation', 'DuoStim'].map((v) => ({ value: v, label: v }))}
                                     />
+                                    {inputs.protocol !== 'Luteal stimulation' && inputs.protocol !== 'DuoStim' && (
+                                        <SelectField
+                                            label={language === 'th' ? 'Day 1 อ้างอิง' : 'Day 1 Reference'}
+                                            name="day1Reference"
+                                            value={inputs.day1Reference || 'menses'}
+                                            onChange={onInputChange}
+                                            options={[
+                                                { value: 'menses', label: language === 'th' ? 'ประจำเดือน (Menses)' : 'Menses' },
+                                                { value: 'opu', label: language === 'th' ? 'วัน OPU / วันตกไข่' : 'OPU / Ovulation Day' },
+                                            ]}
+                                        />
+                                    )}
 
                                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <SelectField
@@ -1535,6 +1618,115 @@
                                             </div >
                                         )
                                     }
+                                    {
+                                        inputs.protocol === 'Luteal stimulation' && (
+                                            <div className="md:col-span-2 bg-teal-50 p-4 rounded border border-teal-200">
+                                                <h4 className="font-bold text-teal-800 mb-2" style={{ fontFamily: "'Cloud Soft'" }}>Luteal Phase Stimulation Settings</h4>
+                                                <p className="text-sm text-teal-700 mb-3" style={{ fontFamily: "'Cloud Soft'" }}>
+                                                    {language === 'th'
+                                                        ? 'วันที่ 1 = วัน OPU/วันตกไข่ จากรอบก่อนหน้า ใส่วันที่ LMP เป็นวัน OPU หรือ วันตกไข่'
+                                                        : 'Day 1 = Previous OPU/Ovulation day. Set LMP date to the OPU/Ovulation date.'}
+                                                </p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <InputField
+                                                        label={language === 'th' ? 'วันเริ่ม Stimulation (หลัง OPU)' : 'Stimulation Start (days after OPU)'}
+                                                        name="lutealStimStartDay"
+                                                        type="number"
+                                                        value={inputs.lutealStimStartDay || '2'}
+                                                        onChange={onInputChange}
+                                                        placeholder="e.g. 2"
+                                                    />
+                                                    <SelectField
+                                                        label={language === 'th' ? 'กลยุทธ์ป้องกัน Premature LH Surge' : 'LH Surge Prevention Strategy'}
+                                                        name="lutealLhStrategy"
+                                                        value={inputs.lutealLhStrategy || 'antagonist'}
+                                                        onChange={onInputChange}
+                                                        options={[
+                                                            { value: 'antagonist', label: language === 'th' ? 'GnRH Antagonist' : 'GnRH Antagonist' },
+                                                            { value: 'progestin', label: language === 'th' ? 'Progestin (PPOS)' : 'Progestin (PPOS)' },
+                                                        ]}
+                                                    />
+                                                    {(inputs.lutealLhStrategy || 'antagonist') === 'antagonist' && (
+                                                        <SelectField
+                                                            label={t.antagonistMedication}
+                                                            name="antagonistMedication"
+                                                            value={inputs.antagonistMedication || ''}
+                                                            onChange={onInputChange}
+                                                            options={['Orgalutran (ganirelix) 0.25 mg daily', 'Cetrotide (cetrorelix) 0.25 mg daily'].map((v) => ({ value: v, label: v }))}
+                                                        />
+                                                    )}
+                                                    {(inputs.lutealLhStrategy) === 'progestin' && (
+                                                        <SelectField
+                                                            label={t.progestinMedication}
+                                                            name="lutealProgestinMedication"
+                                                            value={inputs.lutealProgestinMedication || ''}
+                                                            onChange={onInputChange}
+                                                            options={[
+                                                                'Cerazette 1 tab before bedtime',
+                                                                'Provera 5 mg 1 tab before bedtime',
+                                                                'Provera 10 mg 1 tab before bedtime',
+                                                                'Dienogest 2 mg 1 tab before bedtime',
+                                                                'Dydrogesterone 10 mg 1 tab twice a day',
+                                                            ].map((v) => ({ value: v, label: v }))}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+                                    {
+                                        inputs.protocol === 'DuoStim' && (
+                                            <div className="md:col-span-2 bg-amber-50 p-4 rounded border border-amber-200">
+                                                <h4 className="font-bold text-amber-800 mb-2" style={{ fontFamily: "'Cloud Soft'" }}>DuoStim Protocol Settings</h4>
+                                                <p className="text-sm text-amber-700 mb-3" style={{ fontFamily: "'Cloud Soft'" }}>Phase 1 (Follicular) uses the gonadotropin settings above. Configure Phase 2 (Luteal) below.</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <InputField
+                                                        label="Phase 2 Start Day (post-first OPU)"
+                                                        name="duoPhase2StartDay"
+                                                        type="number"
+                                                        value={inputs.duoPhase2StartDay || '5'}
+                                                        onChange={onInputChange}
+                                                        placeholder="e.g. 5"
+                                                    />
+                                                    <SelectField
+                                                        label="Phase 2 Gonadotropin"
+                                                        name="duoPhase2Gonadotropin"
+                                                        value={inputs.duoPhase2Gonadotropin || ''}
+                                                        onChange={onInputChange}
+                                                        options={['Same as Phase 1', 'Gonal-F', 'Puregon', 'Pergoveris', 'Menopur', 'Rekovelle', 'Follitrope'].map((v) => ({ value: v, label: v }))}
+                                                    />
+                                                    <InputField
+                                                        label="Phase 2 Gonadotropin Dose"
+                                                        name="duoPhase2Dose"
+                                                        value={inputs.duoPhase2Dose || ''}
+                                                        onChange={onInputChange}
+                                                        placeholder="e.g. 300"
+                                                    />
+                                                    <SelectField
+                                                        label={t.antagonistMedication}
+                                                        name="antagonistMedication"
+                                                        value={inputs.antagonistMedication || ''}
+                                                        onChange={onInputChange}
+                                                        options={['Orgalutran (ganirelix) 0.25 mg daily', 'Cetrotide (cetrorelix) 0.25 mg daily'].map((v) => ({ value: v, label: v }))}
+                                                    />
+                                                    <SelectField
+                                                        label="Phase 2 Trigger Medication"
+                                                        name="duoPhase2Trigger"
+                                                        value={inputs.duoPhase2Trigger || ''}
+                                                        onChange={onInputChange}
+                                                        options={['Same as Phase 1', 'Ovidrel (Choriogonadotropin alfa) 250 mcg', 'Decapeptyl (Triptorelin) 0.2 mg', 'Lupron (Leuprolide) 1 mg', 'Dual trigger (hCG + GnRH agonist)'].map((v) => ({ value: v, label: v }))}
+                                                    />
+                                                    <SelectField
+                                                        label="Phase 2 Progesterone Supplement"
+                                                        name="duoPhase2Progesterone"
+                                                        value={inputs.duoPhase2Progesterone || ''}
+                                                        onChange={onInputChange}
+                                                        options={['MPA 10 mg daily', 'Micronized progesterone 200 mg daily', 'None'].map((v) => ({ value: v, label: v }))}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    }
                                     <RadioBool label={t.pgta} name="pgta" value={inputs.pgta} onChange={setBool} trueLabel={t.yes} falseLabel={t.no} />
                                     <RadioBool
                                         label={t.planForEmbryoTransfer}
@@ -1630,7 +1822,7 @@
             );
         }
 
-        function TimelineDisplay({ type, patientData, inputs, edits, setEdits, onBack, onSave }) {
+        function TimelineDisplay({ type, patientData, inputs, edits, setEdits, onBack, onSave, onReset, onBackToMenu }) {
             const { t, language } = useLanguage();
             const lmpDate = useMemo(() => {
                 const d = patientData.lmp ? new Date(patientData.lmp) : new Date();
@@ -1639,7 +1831,16 @@
             }, [patientData.lmp]);
 
             const base = useMemo(
-                () => buildTimelineBase(type, patientData, inputs, t, language),
+                () => {
+                    try {
+                        const result = buildTimelineBase(type, patientData, inputs, t, language);
+                        console.log('buildTimelineBase OK:', result.visits.length, 'visits,', result.medicationBars.length, 'meds');
+                        return result;
+                    } catch(e) {
+                        console.error('buildTimelineBase CRASHED:', e);
+                        return { title: 'Error', visits: [], medicationBars: [], footerNote: '', phase2: null };
+                    }
+                },
                 [type, patientData, inputs, t, language],
             );
 
@@ -1656,8 +1857,19 @@
 
             const setEdit = (id, patch) => setEdits((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...patch } }));
 
+            const handleFieldClick = (visitId, fieldKey, currentVal, label, suffix) => {
+                const newVal = prompt(`${label}:`, currentVal || '');
+                if (newVal !== null) {
+                    setEdit(visitId, { [fieldKey]: newVal });
+                }
+            };
+
+            // DuoStim phase toggle
+            const [showPhase2, setShowPhase2] = React.useState(false);
+            const activeBase = (showPhase2 && base.phase2) ? base.phase2 : base;
+
             const applied = useMemo(() => {
-                const currentVisits = base.visits
+                const currentVisits = activeBase.visits
                     .map((v) => {
                         const e = edits[v.id];
                         let day = v.day;
@@ -1699,26 +1911,30 @@
                     // We don't force them TO visit 4 anymore as they are "1 day after".
 
                     // Force all FET medication bars to end at the final visit (fet-v7).
-                    base.medicationBars.forEach((m) => setEnd(m.id, 'fet-v7'));
+                    activeBase.medicationBars.forEach((m) => setEnd(m.id, 'fet-v7'));
                 } else if (type === 'ora') {
                     setStart('ora-m1', 'ora-v2');
                     setStart('ora-m2', 'ora-v3');
                     ['ora-m3', 'ora-m4'].forEach((m) => setStart(m, 'ora-v4'));
-                    base.medicationBars.forEach((m) => setEnd(m.id, 'ora-v5'));
+                    activeBase.medicationBars.forEach((m) => setEnd(m.id, 'ora-v5'));
                 }
                 if (type === 'opu') {
                     const v3Day = getDayByVid('opu-v4');
                     if (v3Day) {
+                        // Cap trigger bars at Visit 3 position
                         medOverrides['opu-m-trigger'] = { start: v3Day, end: v3Day };
+                        medOverrides['opu-m-lut-trigger'] = { start: v3Day, end: v3Day };
 
                         const medsToCap = ['opu-m-ant', 'opu-m-ppos'];
-                        // Only cap OPU Main Gonadotropin if it is NOT Elonva. 
+                        // Only cap OPU Main Gonadotropin if it is NOT Elonva.
                         // If it is Elonva, it has a fixed duration handled in buildTimelineBase.
                         if (inputs.gonadotropinMedication !== 'Elonva') {
                             medsToCap.push('opu-m-gnd');
                         }
                         // Post-Elonva always ends at trigger decision (Visit 3)
                         medsToCap.push('opu-m-post-elonva');
+                        // Luteal stimulation medication bars
+                        medsToCap.push('opu-m-lut-gnd', 'opu-m-lut-ant', 'opu-m-lut-progestin');
 
                         medsToCap.forEach((m) => setEnd(m, 'opu-v4'));
                     }
@@ -1736,7 +1952,7 @@
                         };
                     }
                 }
-                const finalMedicationBars = base.medicationBars.map((m) => {
+                const finalMedicationBars = activeBase.medicationBars.map((m) => {
                     const override = medOverrides[m.id] || {};
                     const edit = edits[m.id] || {};
                     let startDay = override.start !== undefined ? override.start : m.startDay;
@@ -1750,8 +1966,8 @@
                     const label = edit.labelOverride !== undefined ? edit.labelOverride : m.label;
                     return { ...m, startDay, endDay, label };
                 });
-                return { ...base, visits: currentVisits, medicationBars: finalMedicationBars, sundayVisits };
-            }, [base, edits, lmpDate, type]);
+                return { ...activeBase, visits: currentVisits, medicationBars: finalMedicationBars, sundayVisits };
+            }, [activeBase, edits, lmpDate, type]);
 
             const headerHeight = 220;
             const footerHeight = 80;
@@ -1791,8 +2007,6 @@
                     const lineCount = v.details.length;
                     let extra = 0;
                     // Provide additional height for certain visits based on timeline type.
-                    // Increase the extra height for FET embryo transfer (fet-v6) and final visit (fet-v7)
-                    // to avoid text overlap when the timeline is scaled down.
                     if (v.id === 'fet-v6') {
                         extra = 120;
                     } else if (v.id === 'fet-v7') {
@@ -1805,6 +2019,14 @@
                         extra = 50;
                     } else if (['ora-v2', 'ora-v3', 'ora-v4'].includes(v.id)) {
                         extra = 60;
+                    }
+                    // OPU visits with many details (e.g. Luteal/DuoStim) need extra height
+                    if (type === 'opu' && lineCount >= 4) {
+                        extra = Math.max(extra, 40);
+                    }
+                    // DuoStim phase 2 visits
+                    if (v.id && v.id.startsWith('duo-p2-')) {
+                        extra = Math.max(extra, 40);
                     }
                     return { ...v, h: 30 + lineCount * 26 + extra };
                 });
@@ -1880,7 +2102,7 @@
                 const textColors = ['#065f46', '#9d174d', '#3730A3', '#854d0e', '#ea580c']; // Dark colors for outlines
                 const bgColors = ['#dcfce7', '#fce7f3', '#e0e7ff', '#fef9c3', '#ffedd5']; // Tinted backgrounds
                 return applied.medicationBars.map((m, i) => {
-                    const isTrigger = m.id === 'opu-m-trigger';
+                    const isTrigger = m.id === 'opu-m-trigger' || m.id === 'opu-m-lut-trigger' || m.id === 'duo-p2-m-trigger';
                     let x, w, y, h;
                     const startY = adjustY(m.startDay);
                     const endY = adjustY(m.endDay);
@@ -2064,17 +2286,143 @@
                 });
             };
 
+            const handleSaveAll = () => {
+                // 1. Save JSON first
+                onSave();
+
+                const printEl = document.getElementById('print-container');
+                if (!printEl) return;
+
+                const hn = patientData.hn || '';
+                const fname = patientData.name || '';
+                const lname = patientData.lastName || '';
+                const typeStr = type.toUpperCase();
+                const now = new Date();
+                const day = String(now.getDate());
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const month = months[now.getMonth()];
+                const year = now.getFullYear();
+                const dateStr = `${day} ${month} ${year}`;
+                const parts = [typeStr, hn.trim(), fname.trim(), lname.trim(), dateStr].filter(Boolean);
+                const filename = parts.join(' ');
+
+                document.fonts.ready.then(() => {
+                    const node = printEl.cloneNode(true);
+                    node.removeAttribute('id');
+                    node.style.position = 'fixed';
+                    node.style.left = '0';
+                    node.style.top = '0';
+                    node.style.zIndex = '-9999';
+                    node.style.display = 'block';
+                    node.style.visibility = 'visible';
+                    node.style.transform = 'none';
+                    node.style.width = '794px';
+                    node.style.height = '1123px';
+                    node.style.overflow = 'hidden';
+                    document.body.appendChild(node);
+
+                    requestAnimationFrame(() => {
+                        const scaleFactor = 3;
+                        domtoimage.toJpeg(node, { quality: 1.0, bgcolor: '#ffffff', width: 794 * scaleFactor, height: 1123 * scaleFactor, style: { transform: 'scale(' + scaleFactor + ')', transformOrigin: 'top left' } })
+                            .then(function (dataUrl) {
+                                document.body.removeChild(node);
+
+                                // Save JPG
+                                fetch('http://localhost:8012/api/save', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ type: 'jpg', filename: filename, content: dataUrl }),
+                                    headers: { 'Content-Type': 'application/json' }
+                                }).catch(e => {
+                                    console.log('Failed to auto-save JPG', e);
+                                    const link = document.createElement('a');
+                                    link.download = `${filename}.jpg`;
+                                    link.href = dataUrl;
+                                    link.click();
+                                });
+
+                                // Save PDF
+                                const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                                pdf.addImage(dataUrl, 'JPEG', 0, 0, 210, 297);
+                                const pdfDataUri = pdf.output('datauristring');
+                                fetch('http://localhost:8012/api/save', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ type: 'pdf', filename: filename, content: pdfDataUri }),
+                                    headers: { 'Content-Type': 'application/json' }
+                                }).catch(e => {
+                                    console.log('Failed to auto-save PDF', e);
+                                    pdf.save(`${filename}.pdf`);
+                                });
+
+                                // Open JPG for printing
+                                const printWindow = window.open('', '_blank');
+                                if (printWindow) {
+                                    printWindow.document.write(`
+                                        <html>
+                                        <head><title>Print Timeline</title></head>
+                                        <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f3f4f6;">
+                                            <img src="${dataUrl}" style="max-width:100%;height:auto;" onload="setTimeout(()=>window.print(),500)" />
+                                        </body>
+                                        </html>
+                                    `);
+                                    printWindow.document.close();
+                                }
+
+                                alert('All files saved! (JSON + JPG + PDF)');
+                            })
+                            .catch(function (error) {
+                                console.error('Save All failed:', error);
+                                alert('Could not generate image. Please try again.');
+                                if (document.body.contains(node)) document.body.removeChild(node);
+                            });
+                    });
+                });
+            };
+
             return (
                 <div>
-                    <div className="no-print flex justify-between items-center mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <button
-                            onClick={onBack}
-                            className="px-4 py-2 text-gray-700 bg-white border rounded shadow-sm"
-                            style={{ fontFamily: "'Cloud Soft'" }}
-                        >
-                            ← {t.back}
-                        </button>
-                        <div className="flex gap-4">
+                    <div className="no-print flex flex-wrap justify-between items-center mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200 gap-2">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={onBackToMenu}
+                                className="px-4 py-2 text-gray-700 bg-white border rounded shadow-sm hover:bg-gray-100"
+                                style={{ fontFamily: "'Cloud Soft'" }}
+                            >
+                                🏠 {t.mainMenu}
+                            </button>
+                            <button
+                                onClick={onBack}
+                                className="px-4 py-2 text-gray-700 bg-white border rounded shadow-sm hover:bg-gray-100"
+                                style={{ fontFamily: "'Cloud Soft'" }}
+                            >
+                                ← {t.back}
+                            </button>
+                            <button
+                                onClick={onReset}
+                                className="px-4 py-2 text-red-600 bg-white border border-red-200 rounded shadow-sm hover:bg-red-50"
+                                style={{ fontFamily: "'Cloud Soft'" }}
+                            >
+                                {t.reset}
+                            </button>
+                            {base.phase2 && (
+                                <button
+                                    onClick={() => setShowPhase2(!showPhase2)}
+                                    className={`px-4 py-2 font-bold rounded shadow-sm ${showPhase2 ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200'}`}
+                                    style={{ fontFamily: "'Cloud Soft'" }}
+                                >
+                                    {showPhase2 ? '← Phase 1 (Follicular)' : 'Phase 2 (Luteal) →'}
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={handleSaveAll}
+                                className="px-6 py-2 bg-green-600 text-white font-bold rounded shadow flex gap-2 items-center hover:bg-green-700"
+                                style={{ fontFamily: "'Cloud Soft'" }}
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                Save All &amp; Print
+                            </button>
                             <button
                                 type="button"
                                 onClick={onSave}
@@ -2155,7 +2503,7 @@
                                         </div>
                                         {(type === 'opu' || type === 'iui') ? (
                                             <div className="flex gap-2 items-end mt-1">
-                                                <div className="w-20">
+                                                <div className="w-16">
                                                     <label className="text-xs text-gray-500">Day</label>
                                                     <input
                                                         type="number"
@@ -2166,9 +2514,15 @@
                                                 </div>
                                                 <div className="flex-1">
                                                     <label className="text-xs text-gray-500">Date</label>
-                                                    <div className="p-1 px-2 border border-transparent bg-gray-100 rounded text-gray-700 font-medium">
-                                                        {formatDate(addDays(lmpDate, v.day - 1))}
-                                                    </div>
+                                                    <input
+                                                        type="date"
+                                                        className="w-full border rounded p-1"
+                                                        value={toISODate(addDays(lmpDate, v.day - 1))}
+                                                        onChange={(e) => {
+                                                            const newDay = dayFromISO(e.target.value, lmpDate);
+                                                            if (newDay) setEdit(v.id, { day: newDay });
+                                                        }}
+                                                    />
                                                 </div>
                                             </div>
                                         ) : (
@@ -2206,6 +2560,10 @@
                                     headerHeight={headerHeight}
                                     footerHeight={footerHeight}
                                     tableHeight={tableHeight}
+                                    edits={edits}
+                                    handleFieldClick={handleFieldClick}
+                                    setEdit={setEdit}
+                                    isPrintMode={false}
                                 />
                             </div>
                         </div>
@@ -2229,13 +2587,17 @@
                             headerHeight={headerHeight}
                             footerHeight={footerHeight}
                             tableHeight={tableHeight}
+                            edits={edits}
+                            handleFieldClick={handleFieldClick}
+                            setEdit={setEdit}
+                            isPrintMode={true}
                         />
                     </div>
                 </div >
             );
         }
 
-        function SVGTemplate({ svgWidth, svgHeight, type, patientData, inputs, applied, t, language, visitItems, barLayout, timelineX, timelineStartY, timelineEndY, headerHeight, footerHeight, tableHeight }) {
+        function SVGTemplate({ svgWidth, svgHeight, type, patientData, inputs, applied, t, language, visitItems, barLayout, timelineX, timelineStartY, timelineEndY, headerHeight, footerHeight, tableHeight, edits, handleFieldClick, setEdit, isPrintMode }) {
             const fetGroupIds = ['fet-m3', 'fet-m4', 'fet-m5'];
             const groupBars = type === 'fet' ? barLayout.filter(m => fetGroupIds.includes(m.id)) : [];
             let bracketData = null;
@@ -2375,34 +2737,86 @@
                                             <tspan fontSize="22" fontWeight="800" className="fill-indigo-800">{v.label}</tspan>
                                             <tspan fontSize="20" fontWeight="700" className="fill-gray-700" dx="8">{formatDate(addDays(patientData.lmp, v.day - 1))}</tspan>
                                         </text>
-                                        {v.details.map((d, i) => (
-                                            <text
-                                                key={i}
-                                                x={timelineX + 25}
-                                                y={v._y + 30 + i * 24}
-                                                className="text-lg fill-gray-600 font-medium"
-                                                style={{ fontFamily: "'Cloud Soft', sans-serif" }}
-                                            >
-                                                {d}
-                                            </text>
-                                        ))}
+                                        {v.details.map((d, i) => {
+                                            if (typeof d === 'string' && d.includes('____')) {
+                                                const parts = d.split(/(_{3,})/g);
+                                                let fieldIdx = 0;
+                                                const hasFilled = [];
+                                                const segments = parts.map((part, pi) => {
+                                                    if (/^_{3,}$/.test(part)) {
+                                                        const fKey = `detail_${i}_${fieldIdx}`;
+                                                        const val = edits[v.id]?.[fKey];
+                                                        hasFilled.push(!!val);
+                                                        fieldIdx++;
+                                                        return val || '_______';
+                                                    }
+                                                    return part;
+                                                });
+                                                const allFilled = hasFilled.length > 0 && hasFilled.every(Boolean);
+                                                return (
+                                                    <g key={i}>
+                                                        {!allFilled && !isPrintMode && (
+                                                            <rect
+                                                                x={timelineX + 23}
+                                                                y={v._y + 30 + i * 24 - 14}
+                                                                width={visitAreaWidth - 10}
+                                                                height={20}
+                                                                rx="3"
+                                                                fill="#fef3c7"
+                                                                fillOpacity="0.5"
+                                                            />
+                                                        )}
+                                                        <text
+                                                            x={timelineX + 25}
+                                                            y={v._y + 30 + i * 24}
+                                                            className={`text-lg font-medium cursor-pointer ${allFilled ? 'fill-indigo-700' : 'fill-gray-600'}`}
+                                                            style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                            onClick={() => {
+                                                                const blanks = d.split(/(_{3,})/g).filter(p => /^_{3,}$/.test(p));
+                                                                blanks.forEach((_, bi) => {
+                                                                    const fKey = `detail_${i}_${bi}`;
+                                                                    const label = d.replace(/_{3,}/g, '___').substring(0, 40);
+                                                                    const val = prompt(`${label} (field ${bi + 1}):`, edits[v.id]?.[fKey] || '');
+                                                                    if (val !== null) setEdit(v.id, { [fKey]: val });
+                                                                });
+                                                            }}
+                                                        >
+                                                            {segments.join('')}
+                                                        </text>
+                                                    </g>
+                                                );
+                                            }
+                                            return (
+                                                <text
+                                                    key={i}
+                                                    x={timelineX + 25}
+                                                    y={v._y + 30 + i * 24}
+                                                    className="text-lg fill-gray-600 font-medium"
+                                                    style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                >
+                                                    {d}
+                                                </text>
+                                            );
+                                        })}
                                         {isVisit1_3 && (
                                             <g transform={`translate(${timelineX + 25}, ${v._y + 30 + v.details.length * 24 + 15})`}>
                                                 <text
                                                     x="0"
                                                     y="0"
-                                                    className="text-sm fill-gray-800"
+                                                    className="text-sm fill-gray-800 cursor-pointer"
                                                     style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                    onClick={() => handleFieldClick(v.id, 'et_mm', edits[v.id]?.et_mm, 'ET (mm)', '')}
                                                 >
-                                                    ET _______ mm
+                                                    ET {edits[v.id]?.et_mm || '_______'} mm
                                                 </text>
                                                 <text
                                                     x="0"
                                                     y="22"
-                                                    className="text-sm fill-gray-400"
+                                                    className="text-sm fill-gray-800 cursor-pointer"
                                                     style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                    onClick={() => handleFieldClick(v.id, 'notes', edits[v.id]?.notes, 'Notes', '')}
                                                 >
-                                                    _______________________________________
+                                                    {edits[v.id]?.notes || '_______________________________________'}
                                                 </text>
                                             </g>
                                         )}
@@ -2410,62 +2824,34 @@
                                             <text
                                                 x={timelineX + 25}
                                                 y={v._y + 30 + v.details.length * 24 + 15}
-                                                className="text-sm fill-gray-800"
+                                                className="text-sm fill-gray-800 cursor-pointer"
                                                 style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                onClick={() => handleFieldClick(v.id, 'prog_level', edits[v.id]?.prog_level, t.progLevel, '')}
                                             >
-                                                {t.progLevel} _______ ng/ml
+                                                {t.progLevel} {edits[v.id]?.prog_level || '_______'} ng/ml
                                             </text>
                                         )}
                                         {isFetVisit5 && (
                                             <g transform={`translate(${timelineX + 25}, ${v._y + 30 + v.details.length * 24 + 15})`}>
-                                                <text
-                                                    x="0"
-                                                    y="0"
-                                                    className="text-sm fill-gray-800 font-medium"
-                                                    style={{ fontFamily: "'Cloud Soft', sans-serif" }}
-                                                >
-                                                    {t.thawNum} _______
-                                                </text>
-                                                <text
-                                                    x="0"
-                                                    y="22"
-                                                    className="text-sm fill-gray-800 font-medium"
-                                                    style={{ fontFamily: "'Cloud Soft', sans-serif" }}
-                                                >
-                                                    {t.frozenId} _______
-                                                </text>
-                                                <text
-                                                    x="0"
-                                                    y="44"
-                                                    className="text-sm fill-gray-800 font-medium"
-                                                    style={{ fontFamily: "'Cloud Soft', sans-serif" }}
-                                                >
-                                                    {t.dateFrozen} _______
-                                                </text>
-                                                <text
-                                                    x="0"
-                                                    y="66"
-                                                    className="text-sm fill-gray-800 font-medium"
-                                                    style={{ fontFamily: "'Cloud Soft', sans-serif" }}
-                                                >
-                                                    {t.strawNum} _______
-                                                </text>
-                                                <text
-                                                    x="0"
-                                                    y="88"
-                                                    className="text-sm fill-gray-800 font-medium"
-                                                    style={{ fontFamily: "'Cloud Soft', sans-serif" }}
-                                                >
-                                                    {t.embNum} _______
-                                                </text>
-                                                <text
-                                                    x="0"
-                                                    y="110"
-                                                    className="text-sm fill-gray-800 font-medium"
-                                                    style={{ fontFamily: "'Cloud Soft', sans-serif" }}
-                                                >
-                                                    {t.embStage} _______
-                                                </text>
+                                                {[
+                                                    { key: 'thaw_num', label: t.thawNum, y: 0 },
+                                                    { key: 'frozen_id', label: t.frozenId, y: 22 },
+                                                    { key: 'date_frozen', label: t.dateFrozen, y: 44 },
+                                                    { key: 'straw_num', label: t.strawNum, y: 66 },
+                                                    { key: 'emb_num', label: t.embNum, y: 88 },
+                                                    { key: 'emb_stage', label: t.embStage, y: 110 },
+                                                ].map(f => (
+                                                    <text
+                                                        key={f.key}
+                                                        x="0"
+                                                        y={f.y}
+                                                        className="text-sm fill-gray-800 font-medium cursor-pointer"
+                                                        style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                        onClick={() => handleFieldClick(v.id, f.key, edits[v.id]?.[f.key], f.label, '')}
+                                                    >
+                                                        {f.label} {edits[v.id]?.[f.key] || '_______'}
+                                                    </text>
+                                                ))}
                                             </g>
                                         )}
                                         {isFetVisit6 && (
@@ -2473,18 +2859,20 @@
                                                 <text
                                                     x="0"
                                                     y="0"
-                                                    className="text-sm fill-gray-800"
+                                                    className="text-sm fill-gray-800 cursor-pointer"
                                                     style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                    onClick={() => handleFieldClick(v.id, 'hcg_level', edits[v.id]?.hcg_level, t.hcgLevel, '')}
                                                 >
-                                                    {t.hcgLevel} _______ mIU/mL
+                                                    {t.hcgLevel} {edits[v.id]?.hcg_level || '_______'} mIU/mL
                                                 </text>
                                                 <text
                                                     x="0"
                                                     y="22"
-                                                    className="text-sm fill-gray-800"
+                                                    className="text-sm fill-gray-800 cursor-pointer"
                                                     style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                    onClick={() => handleFieldClick(v.id, 'prog_level', edits[v.id]?.prog_level, t.progLevel, '')}
                                                 >
-                                                    {t.progLevel} _______ ng/ml
+                                                    {t.progLevel} {edits[v.id]?.prog_level || '_______'} ng/ml
                                                 </text>
                                             </g>
                                         )}
@@ -2528,10 +2916,11 @@
                                                 <text
                                                     x="0"
                                                     y="90"
-                                                    className="text-sm fill-gray-800"
+                                                    className="text-sm fill-gray-800 cursor-pointer"
                                                     style={{ fontFamily: "'Cloud Soft', sans-serif" }}
+                                                    onClick={() => handleFieldClick(v.id, 'receptive_hours', edits[v.id]?.receptive_hours, t.receptiveAt, '')}
                                                 >
-                                                    {t.receptiveAt} _______ {t.hoursPlusMinus}
+                                                    {t.receptiveAt} {edits[v.id]?.receptive_hours || '_______'} {t.hoursPlusMinus}
                                                 </text>
                                             </g>
                                         )}
@@ -2909,8 +3298,12 @@
 
         function buildTimelineBase(type, patientData, inputs, t, language) {
             if (type === 'opu') {
+                const day1Ref = inputs.day1Reference || 'menses';
+                const day1Label = day1Ref === 'opu'
+                    ? (language === 'th' ? 'OPU / วันตกไข่' : 'OPU / Ovulation Day')
+                    : t.menses;
                 const visits = [
-                    { id: 'opu-v1', day: 1, label: t.menses, details: [] },
+                    { id: 'opu-v1', day: 1, label: day1Label, details: [] },
                     { id: 'opu-v2', day: 3, label: `${t.visit} 1`, details: [t.tvs, t.bloodTest, t.hormoneInjection, t.treatmentPlan] },
                     { id: 'opu-v3', day: 9, label: `${t.visit} 2`, details: [t.tvs, t.continueHormoneInjection] },
                     { id: 'opu-v4', day: 12, label: `${t.visit} 3`, details: [t.tvs, t.scheduleTriggerShotOnly, t.scheduleOPUDate] },
@@ -3033,13 +3426,125 @@
                         textColor: '#115e59',
                     });
                 }
-                if (inputs.triggerMedication) {
+                if (inputs.protocol === 'Luteal stimulation') {
+                    // Luteal phase stim: Day 1 = OPU/ovulation day (not menses)
+                    // All days are relative to OPU day as day 1
+                    const stimStartOffset = parseInt(inputs.lutealStimStartDay) || 2;
+
+                    // Override visits — day 1 is OPU/ovulation reference
+                    visits.length = 0;
+                    visits.push(
+                        { id: 'opu-v1', day: 1, label: language === 'th' ? 'OPU / วันตกไข่' : 'OPU / Ovulation Day', details: [language === 'th' ? 'จุดเริ่มต้น Luteal Phase' : 'Luteal Phase Reference'] },
+                        { id: 'opu-v2', day: stimStartOffset, label: `${t.visit} 1`, details: [t.tvs, t.bloodTest, t.hormoneInjection] },
+                        { id: 'opu-v3', day: stimStartOffset + 6, label: `${t.visit} 2`, details: [t.tvs, t.continueHormoneInjection] },
+                        { id: 'opu-v4', day: stimStartOffset + 9, label: `${t.visit} 3`, details: [t.tvs, t.scheduleOPUDate] },
+                        { id: 'opu-v5', day: stimStartOffset + 11, label: `${t.visit} 4 ${t.lab}`, details: [t.eggCollection, t.semenCollection, t.icsi] },
+                    );
+
+                    // Clear medication bars for recalculation
+                    medicationBars.length = 0;
+
+                    // Gonadotropins for luteal stimulation
+                    if (gMed) {
+                        const unit = (gMed === 'Elonva' || gMed === 'Rekovelle') ? 'mcg' : 'IU';
+                        let lutealGndSc = '';
+                        if (gMed && gMed !== 'Elonva') {
+                            lutealGndSc = language === 'th'
+                                ? '\nฉีดใต้ผิวหนัง\nDAILY เวลาเดิมทุกวัน'
+                                : '\nSubcutaneous injection\nDAILY Fixed time';
+                        }
+                        medicationBars.push({
+                            id: 'opu-m-lut-gnd',
+                            shortName: 'Gonadotropins',
+                            startDay: stimStartOffset,
+                            endDay: stimStartOffset + 9,
+                            label: `${gMed}\n${gDose} ${unit}${lutealGndSc}`.trim(),
+                            color: '#d1fae5',
+                            textColor: '#065f46',
+                        });
+                    }
+
+                    // LH Surge Prevention: Antagonist or Progestin
+                    const lutealStrategy = inputs.lutealLhStrategy || 'antagonist';
+                    if (lutealStrategy === 'antagonist' && inputs.antagonistMedication) {
+                        let antLabel = inputs.antagonistMedication;
+                        if (inputs.antagonistMedication.includes('Orgalutran')) {
+                            antLabel = language === 'th'
+                                ? "Orgalutran\n0.25 mg\n1 เข็ม ฉีดใต้ผิวหนัง\nวันละ 1 ครั้ง เวลาเดิมทุกวัน"
+                                : "Orgalutran\n0.25 mg\n1 syringe Subcutaneous injection\nOnce daily Fixed time";
+                        } else if (inputs.antagonistMedication.includes('Cetrotide')) {
+                            antLabel = language === 'th'
+                                ? "Cetrotide\n0.25 mg\n1 เข็ม ฉีดใต้ผิวหนัง\nวันละ 1 ครั้ง เวลาเดิมทุกวัน"
+                                : "Cetrotide\n0.25 mg\n1 syringe Subcutaneous injection\nOnce daily Fixed time";
+                        }
+                        medicationBars.push({
+                            id: 'opu-m-lut-ant',
+                            shortName: 'Antagonist',
+                            startDay: stimStartOffset + 4,
+                            endDay: stimStartOffset + 9,
+                            label: antLabel,
+                            color: '#fee2e2',
+                            textColor: '#991b1b',
+                        });
+                    } else if (lutealStrategy === 'progestin' && inputs.lutealProgestinMedication) {
+                        // Use same label mapping as PPOS
+                        let lutProgestinLabel = inputs.lutealProgestinMedication;
+                        if (inputs.lutealProgestinMedication.includes('Cerazette')) {
+                            lutProgestinLabel = language === 'th'
+                                ? "Cerazette\n1 เม็ด รับประทาน\nวันละ 1 ครั้ง ก่อนนอน"
+                                : "Cerazette\n1 tab Oral\nOnce daily Bedtime";
+                        } else if (inputs.lutealProgestinMedication.includes('Provera 5')) {
+                            lutProgestinLabel = language === 'th'
+                                ? "Provera\n5 mg\n1 เม็ด รับประทาน\nวันละ 1 ครั้ง ก่อนนอน"
+                                : "Provera\n5 mg\n1 tab Oral\nOnce daily Bedtime";
+                        } else if (inputs.lutealProgestinMedication.includes('Provera 10')) {
+                            lutProgestinLabel = language === 'th'
+                                ? "Provera\n10 mg\n1 เม็ด รับประทาน\nวันละ 1 ครั้ง ก่อนนอน"
+                                : "Provera\n10 mg\n1 tab Oral\nOnce daily Bedtime";
+                        } else if (inputs.lutealProgestinMedication.includes('Dienogest')) {
+                            lutProgestinLabel = language === 'th'
+                                ? "Dienogest\n2 mg\n1 เม็ด รับประทาน\nวันละ 1 ครั้ง ก่อนนอน"
+                                : "Dienogest\n2 mg\n1 tab Oral\nOnce daily Bedtime";
+                        } else if (inputs.lutealProgestinMedication.includes('Dydrogesterone')) {
+                            lutProgestinLabel = language === 'th'
+                                ? "Dydrogesterone\n10 mg\n1 เม็ด รับประทาน\nวันละ 2 ครั้ง เช้า - เย็น"
+                                : "Dydrogesterone\n10 mg\n1 tab Oral\nTwice daily Morning & Evening";
+                        }
+                        medicationBars.push({
+                            id: 'opu-m-lut-progestin',
+                            shortName: 'Progestin',
+                            startDay: stimStartOffset,
+                            endDay: stimStartOffset + 9,
+                            label: lutProgestinLabel,
+                            color: '#ccfbf1',
+                            textColor: '#115e59',
+                        });
+                    }
+
+                    // Handle trigger for luteal stimulation
+                    if (inputs.triggerMedication) {
+                        const v3 = visits.find((v) => v.id === 'opu-v4');
+                        if (v3) {
+                            v3.details.push(`Trigger: ${inputs.triggerMedication}`);
+                            v3.details.push(`${t.triggerTime}: __________`);
+                        }
+                        medicationBars.push({
+                            id: 'opu-m-lut-trigger',
+                            shortName: 'Trigger',
+                            startDay: stimStartOffset + 9,
+                            endDay: stimStartOffset + 9,
+                            label: inputs.triggerMedication,
+                            color: '#009473',
+                            textColor: '#ffffff',
+                        });
+                    }
+                }
+                if (inputs.triggerMedication && inputs.protocol !== 'Luteal stimulation') {
                     const v3 = visits.find((v) => v.id === 'opu-v4');
                     if (v3) {
                         v3.details = v3.details.filter((d) => d !== t.scheduleTriggerShotOnly);
-                        v3.details.push(t.triggerMedication);
-                        v3.details.push(inputs.triggerMedication);
-                        v3.details.push(`${t.triggerTime} __________`);
+                        v3.details.push(`Trigger: ${inputs.triggerMedication}`);
+                        v3.details.push(`${t.triggerTime}: __________`);
                     }
                     medicationBars.push({
                         id: 'opu-m-trigger',
@@ -3051,7 +3556,114 @@
                         textColor: '#ffffff',
                     });
                 }
-                return { title: t.opuTimeline, visits, medicationBars, footerNote: '' };
+                let phase2 = null;
+                if (inputs.protocol === 'DuoStim') {
+                    // Phase 2 uses relative days: Day 1 = Phase 1 OPU day
+                    const p2StartOffset = parseInt(inputs.duoPhase2StartDay) || 5;
+
+                    const p2Med = inputs.duoPhase2Gonadotropin === 'Same as Phase 1' || !inputs.duoPhase2Gonadotropin
+                        ? (gMed || '')
+                        : inputs.duoPhase2Gonadotropin;
+                    const p2Dose = inputs.duoPhase2Dose || gDose || '';
+                    const p2Unit = (p2Med === 'Elonva' || p2Med === 'Rekovelle') ? 'mcg' : 'IU';
+
+                    let p2Sc = '';
+                    if (p2Med && p2Med !== 'Elonva') {
+                        p2Sc = language === 'th'
+                            ? '\nฉีดใต้ผิวหนัง\nDAILY เวลาเดิมทุกวัน'
+                            : '\nSubcutaneous injection\nDAILY Fixed time';
+                    }
+
+                    const p2Visits = [
+                        { id: 'duo-p2-v1', day: 1, label: language === 'th' ? 'OPU Phase 1' : 'Phase 1 OPU', details: [language === 'th' ? 'จุดเริ่มต้น Phase 2' : 'Phase 2 Start Reference'] },
+                        { id: 'duo-p2-v2', day: p2StartOffset, label: `${t.visit} 1 (P2)`, details: [t.tvs, t.bloodTest, t.hormoneInjection, language === 'th' ? 'เริ่ม Luteal Phase Stimulation' : 'Start Luteal Phase Stimulation'] },
+                        { id: 'duo-p2-v3', day: p2StartOffset + 6, label: `${t.visit} 2 (P2)`, details: [t.tvs, t.continueHormoneInjection] },
+                        { id: 'duo-p2-v4', day: p2StartOffset + 9, label: `${t.visit} 3 (P2)`, details: [t.tvs, t.scheduleTriggerShotOnly, t.scheduleOPUDate] },
+                        { id: 'duo-p2-v5', day: p2StartOffset + 11, label: `${t.visit} 4 (P2) ${t.lab}`, details: [t.eggCollection, t.semenCollection, t.icsi] },
+                    ];
+
+                    const p2MedBars = [];
+                    if (p2Med) {
+                        p2MedBars.push({
+                            id: 'duo-p2-m-gnd',
+                            shortName: 'Gonadotropins',
+                            startDay: p2StartOffset,
+                            endDay: p2StartOffset + 9,
+                            label: `${p2Med}\n${p2Dose} ${p2Unit}${p2Sc}`.trim(),
+                            color: '#d1fae5',
+                            textColor: '#065f46',
+                        });
+                    }
+
+                    // Antagonist for phase 2
+                    if (inputs.antagonistMedication) {
+                        let antLabel = inputs.antagonistMedication;
+                        if (inputs.antagonistMedication.includes('Orgalutran')) {
+                            antLabel = language === 'th'
+                                ? "Orgalutran\n0.25 mg\n1 เข็ม ฉีดใต้ผิวหนัง\nวันละ 1 ครั้ง เวลาเดิมทุกวัน"
+                                : "Orgalutran\n0.25 mg\n1 syringe Subcutaneous injection\nOnce daily Fixed time";
+                        } else if (inputs.antagonistMedication.includes('Cetrotide')) {
+                            antLabel = language === 'th'
+                                ? "Cetrotide\n0.25 mg\n1 เข็ม ฉีดใต้ผิวหนัง\nวันละ 1 ครั้ง เวลาเดิมทุกวัน"
+                                : "Cetrotide\n0.25 mg\n1 syringe Subcutaneous injection\nOnce daily Fixed time";
+                        }
+                        p2MedBars.push({
+                            id: 'duo-p2-m-ant',
+                            shortName: 'Antagonist',
+                            startDay: p2StartOffset + 4,
+                            endDay: p2StartOffset + 9,
+                            label: antLabel,
+                            color: '#fee2e2',
+                            textColor: '#991b1b',
+                        });
+                    }
+
+                    // Progesterone for phase 2
+                    if (inputs.duoPhase2Progesterone && inputs.duoPhase2Progesterone !== 'None') {
+                        p2MedBars.push({
+                            id: 'duo-p2-m-prog',
+                            shortName: 'Progesterone',
+                            startDay: p2StartOffset,
+                            endDay: p2StartOffset + 9,
+                            label: inputs.duoPhase2Progesterone,
+                            color: '#f3e8ff',
+                            textColor: '#6b21a8',
+                        });
+                    }
+
+                    // Phase 2 trigger
+                    const p2TriggerMed = inputs.duoPhase2Trigger === 'Same as Phase 1' || !inputs.duoPhase2Trigger
+                        ? inputs.triggerMedication
+                        : inputs.duoPhase2Trigger;
+                    if (p2TriggerMed) {
+                        const v3 = p2Visits.find((v) => v.id === 'duo-p2-v4');
+                        if (v3) {
+                            v3.details = v3.details.filter((d) => d !== t.scheduleTriggerShotOnly);
+                            v3.details.push(`Trigger: ${p2TriggerMed}`);
+                            v3.details.push(`${t.triggerTime}: __________`);
+                        }
+                        p2MedBars.push({
+                            id: 'duo-p2-m-trigger',
+                            shortName: 'Trigger',
+                            startDay: p2StartOffset + 9,
+                            endDay: p2StartOffset + 9,
+                            label: p2TriggerMed,
+                            color: '#009473',
+                            textColor: '#ffffff',
+                        });
+                    }
+
+                    phase2 = {
+                        title: `${t.opuTimeline} - DuoStim Phase 2 (Luteal)`,
+                        visits: p2Visits,
+                        medicationBars: p2MedBars,
+                        footerNote: 'Freeze-all: All embryos from both phases will be cryopreserved.'
+                    };
+                }
+                const opuTitle = inputs.protocol === 'Luteal stimulation' ? `${t.opuTimeline} - Luteal Phase Stimulation`
+                    : inputs.protocol === 'DuoStim' ? `${t.opuTimeline} - DuoStim Phase 1 (Follicular)`
+                    : t.opuTimeline;
+                return { title: opuTitle, visits, medicationBars, footerNote: '', phase2 };
             }
             if (type === 'fet') {
                 const progStart = clampInt(inputs.progesteroneStartDay, 15);
@@ -3129,7 +3741,7 @@
             return { title: '', visits: [], medicationBars: [], footerNote: '' };
         }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        ReactDOM.render(<ErrorBoundary><App /></ErrorBoundary>, document.getElementById('root'));
     </script>
 </body>
 
