@@ -1,0 +1,22 @@
+#!/bin/bash
+
+PORT=8012
+APP_DIR="$HOME/Documents/Timeline Generator"
+
+# Kill any existing server on this port
+lsof -ti tcp:$PORT | xargs kill -9 2>/dev/null
+sleep 0.5
+
+# Start server via osascript so it inherits proper user permissions
+osascript -e "do shell script \"cd '$APP_DIR' && nohup /usr/bin/python3 server.py >> /tmp/timeline-server.log 2>&1 &\""
+
+# Wait for server to be ready (up to 5 seconds)
+for i in $(seq 1 10); do
+    sleep 0.5
+    if curl -s "http://localhost:$PORT" > /dev/null 2>&1; then
+        break
+    fi
+done
+
+# Open in default browser
+open "http://localhost:$PORT"
