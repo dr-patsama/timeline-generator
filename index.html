@@ -2355,17 +2355,20 @@
                 return new Promise((resolve, reject) => {
                     const node = pageElement.cloneNode(true);
                     node.removeAttribute('id');
+                    const isLandscape = pageElement.id === 'print-page1';
+                    const wVal = isLandscape ? 1123 : 794;
+                    const hVal = isLandscape ? 794 : 1123;
                     Object.assign(node.style, {
                         position: 'fixed', left: '0', top: '0', zIndex: '-9999',
                         display: 'block', visibility: 'visible', transform: 'none',
-                        width: '794px', height: '1123px', overflow: 'hidden'
+                        width: wVal + 'px', height: hVal + 'px', overflow: 'hidden'
                     });
                     document.body.appendChild(node);
                     requestAnimationFrame(() => {
                         const sf = 3;
                         domtoimage.toJpeg(node, {
                             quality: 1.0, bgcolor: '#ffffff',
-                            width: 794 * sf, height: 1123 * sf,
+                            width: wVal * sf, height: hVal * sf,
                             style: { transform: `scale(${sf})`, transformOrigin: 'top left' }
                         })
                         .then(url => { document.body.removeChild(node); resolve(url); })
@@ -2393,11 +2396,11 @@
                         const p2 = document.getElementById('print-page2');
                         if (!p1) return;
                         const page1Url = await renderPageImage(p1);
-                        const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-                        pdf.addImage(page1Url, 'JPEG', 0, 0, 210, 297);
+                        const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                        pdf.addImage(page1Url, 'JPEG', 0, 0, 297, 210);
                         if (p2) {
                             const page2Url = await renderPageImage(p2);
-                            pdf.addPage();
+                            pdf.addPage('a4', 'portrait');
                             pdf.addImage(page2Url, 'JPEG', 0, 0, 210, 297);
                         }
                         const pdfUri = pdf.output('datauristring');
@@ -2466,10 +2469,10 @@
                         });
 
                         // Save PDF (both pages)
-                        const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-                        pdf.addImage(page1Url, 'JPEG', 0, 0, 210, 297);
+                        const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                        pdf.addImage(page1Url, 'JPEG', 0, 0, 297, 210);
                         if (page2Url) {
-                            pdf.addPage();
+                            pdf.addPage('a4', 'portrait');
                             pdf.addImage(page2Url, 'JPEG', 0, 0, 210, 297);
                         }
                         const pdfUri = pdf.output('datauristring');
