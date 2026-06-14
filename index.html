@@ -872,7 +872,7 @@
 
                 const json = JSON.stringify(data, null, 2);
 
-                // Filename Generation: HN-FirstName-LastName-Type-MM-YY
+                // Filename Generation: 'HN First Lastname TYPE'
                 const hn = (patientData.hn || '').trim();
                 const fname = (patientData.name || '').trim();
                 const lname = (patientData.lastName || '').trim();
@@ -882,13 +882,8 @@
                 if (typeStr === 'mainMenu') typeStr = 'Project';
                 typeStr = typeStr.toUpperCase();
 
-                // Date format MM-YY
-                const mm = String(now.getMonth() + 1).padStart(2, '0');
-                const yy = String(now.getFullYear()).slice(-2);
-                const dateStr = `${mm}-${yy}`;
-
-                const parts = [hn, fname, lname, typeStr, dateStr].filter(Boolean);
-                let filename = parts.join('-');
+                const parts = [hn, fname, lname, typeStr].filter(Boolean);
+                let filename = parts.join(' ');
                 if (!filename) filename = 'timeline-project';
 
                 try {
@@ -2378,14 +2373,12 @@
             };
 
             const getFilename = () => {
-                const hn = patientData.hn || '';
-                const fname = patientData.name || '';
-                const lname = patientData.lastName || '';
+                const hn = (patientData.hn || '').trim();
+                const fname = (patientData.name || '').trim();
+                const lname = (patientData.lastName || '').trim();
                 const typeStr = type.toUpperCase();
-                const now = new Date();
-                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                const dateStr = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-                return [typeStr, hn.trim(), fname.trim(), lname.trim(), dateStr].filter(Boolean).join(' ');
+                const parts = [hn, fname, lname, typeStr].filter(Boolean);
+                return parts.join(' ');
             };
 
             const handlePrint = () => {
@@ -3500,26 +3493,26 @@
                 }
             }
 
-            // Adjust heights for portrait A4 (794 x 1123)
-            const ch = totalWeeks <= 4 ? 170 : totalWeeks <= 5 ? 140 : 110;
-            const fsDate = totalWeeks <= 4 ? 26 : 22; // Bigger date
-            const fsBody = totalWeeks <= 4 ? 13 : 11; // Bigger body text
-            const fsDay = totalWeeks <= 4 ? 12 : 10;
-            const barHeight = fsBody + 6; // Height of continuous med bar
-            const barSpacing = barHeight + 4; // Spacing between tracks
+            // Adjust heights for Landscape A4 (1123 x 794) to fit exactly on 1 page
+            const ch = totalWeeks <= 4 ? 138 : totalWeeks <= 5 ? 110 : 90;
+            const fsDate = totalWeeks <= 4 ? 24 : 20; // Slightly smaller date
+            const fsBody = totalWeeks <= 4 ? 12 : 10; // Slightly smaller body text
+            const fsDay = totalWeeks <= 4 ? 11 : 9; // Cycle day font size
+            const barHeight = fsBody + 3; // Height of continuous med bar
+            const barSpacing = barHeight; // Spacing between tracks (no space between)
 
             return (
                 <div style={{ width: '1123px', height: '794px', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden', ...fnt, position: 'relative' }}>
                     {/* Header */}
-                    <div style={{ padding: '24px 32px 12px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+                    <div style={{ padding: '16px 32px 8px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '6px' }}>
                             <div style={{ height: '3px', flex: 1, background: 'linear-gradient(90deg, transparent, #0F52BA)' }}></div>
-                            <h2 style={{ fontSize: '32px', fontWeight: 800, color: '#151667', margin: 0, whiteSpace: 'nowrap', fontFamily: "'Kanit', sans-serif" }}>
+                            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#151667', margin: 0, whiteSpace: 'nowrap', fontFamily: "'Kanit', sans-serif" }}>
                                 {applied.title}
                             </h2>
                             <div style={{ height: '3px', flex: 1, background: 'linear-gradient(90deg, #0F52BA, transparent)' }}></div>
                         </div>
-                        <div style={{ fontSize: '16px', color: '#374151', lineHeight: 1.5 }}>
+                        <div style={{ fontSize: '14px', color: '#374151', lineHeight: 1.4 }}>
                             <div>
                                 <b>{t.name}</b> {patientData.name} {patientData.lastName}
                                 <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
@@ -3537,8 +3530,8 @@
                     </div>
 
                     {/* Month Title */}
-                    <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-                        <h3 style={{ fontSize: '26px', fontWeight: 700, color: '#0F52BA', fontFamily: "'Kanit', sans-serif", margin: 0 }}>
+                    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                        <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0F52BA', fontFamily: "'Kanit', sans-serif", margin: 0 }}>
                             {monthHeaderStr}
                         </h3>
                     </div>
@@ -3551,8 +3544,8 @@
                             {dayLabels.map((label, i) => (
                                 <div key={i} style={{
                                     flex: 1,
-                                    padding: '6px 2px',
-                                    fontSize: '16px',
+                                    padding: '4px 2px',
+                                    fontSize: '13px',
                                     fontWeight: 800,
                                     color: i === 6 ? '#e0115f' : '#151667',
                                     textAlign: 'center'
@@ -3658,7 +3651,7 @@
                                     })}
 
                                     {/* 2) Continuous Medication Bars (Overlaid) */}
-                                    <div style={{ position: 'absolute', top: fsDate + 20 + 'px', left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 10 }}>
+                                    <div style={{ position: 'absolute', top: (totalWeeks <= 4 ? 68 : totalWeeks <= 5 ? 54 : 42) + 'px', left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 10 }}>
                                         {wkData.activeWeekMeds.map((m, idx) => {
                                             const colorObj = medColorPalette[m.track % medColorPalette.length];
                                             const leftPct = (m.startCol / 7) * 100;
@@ -3695,9 +3688,28 @@
                         </div>
                     </div>
 
-                    {/* Disclaimer Footer (Restored) */}
-                    <div style={{ padding: '12px 32px 24px', textAlign: 'center', fontSize: '11px', color: '#6b7280', fontStyle: 'italic', borderTop: '1px solid #e5e7eb', marginTop: '12px' }}>
-                        {language === 'th' ? t.cycleNoteTh : t.cycleNoteEn}
+                    {/* Footer Section (Restored & Integrated) */}
+                    <div style={{
+                        padding: '10px 32px 16px',
+                        borderTop: '1px solid #e5e7eb',
+                        marginTop: 'auto',
+                        background: '#fafafa',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#374151', paddingBottom: '2px' }}>
+                            <div>
+                                <b>{language === 'th' ? 'นัดหมายครั้งถัดไป' : 'Next Appointment'}:</b> _________________________________________________
+                            </div>
+                            <div style={{ display: 'flex', gap: '24px' }}>
+                                <span><b>{language === 'th' ? 'แพทย์' : 'Doctor'}:</b> ________________________</span>
+                                <span><b>{language === 'th' ? 'พยาบาล' : 'Nurse'}:</b> ________________________</span>
+                            </div>
+                        </div>
+                        <div style={{ textAlign: 'center', fontSize: '9.5px', color: '#6b7280', fontStyle: 'italic' }}>
+                            {language === 'th' ? t.cycleNoteTh : t.cycleNoteEn}
+                        </div>
                     </div>
                 </div>
             );
