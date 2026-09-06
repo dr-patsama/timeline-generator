@@ -135,6 +135,6 @@ class TimelineServer(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     port = 8012
-    server = HTTPServer(('localhost', port), TimelineServer)
-    print(f"Timeline Generator server running on http://localhost:{port}")
+    server = HTTPServer(('127.0.0.1', port), TimelineServer)
+    print(f"Timeline Generator server running on http://127.0.0.1:{port}")
     server.serve_forever()

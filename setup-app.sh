@@ -21,9 +21,17 @@ if [ -d "$ICONSET" ]; then
 fi
 
 # 2. Compile AppleScript that calls our launch script
-echo 'do shell script "bash \"$HOME/Documents/Timeline Generator/Timeline Generator.app/Contents/MacOS/launch\" &> /tmp/timeline-launch.log &"' > /tmp/timeline_main.applescript
+echo 'try
+    POSIX file "'"$HOME"'/Documents/Timeline Generator" as alias
+end try
+do shell script "bash \"$HOME/Documents/Timeline Generator/Timeline Generator.app/Contents/MacOS/launch\" &> /tmp/timeline-launch.log &"' > /tmp/timeline_main.applescript
 osacompile -o "$APP_DIR/Contents/Resources/Scripts/main.scpt" /tmp/timeline_main.applescript
 echo "✅ AppleScript compiled"
+
+# 2.5 Copy server.py and index.html to Resources folder in the app bundle
+cp "server.py" "$APP_DIR/Contents/Resources/"
+cp "index.html" "$APP_DIR/Contents/Resources/"
+echo "✅ Server files copied to app bundle"
 
 # 3. Make launch script executable
 chmod +x "$APP_DIR/Contents/MacOS/launch"
