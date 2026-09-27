@@ -12,6 +12,8 @@
 - [x] Fix DuoStim Phase 2 medication bar variable bug (p2Start → p2StartOffset) — completed 2026-04-10
 - [x] Add LH surge prevention strategy choice (Antagonist vs Progestin/PPOS) to Luteal Stim — completed 2026-04-10
 - [x] Run `setup-app.sh` to finalize app icon and optionally copy to /Applications — completed 2026-06-13
+- [x] FET: Visit 3 stays on its cycle day; progesterone (and ET) start the day after Visit 3 — completed 2026-09-27
+- [x] Calendar readable on phones: patient JPG uses a phone layout; A4 calendar text larger with no overlap — completed 2026-09-27
 
 ## Someday / Ideas
 

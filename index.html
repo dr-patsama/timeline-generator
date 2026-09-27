@@ -586,7 +586,7 @@
                 sundayWarning: 'Warning: The following visits fall on a Sunday (Clinic Closed):',
                 startDay: 'Start on CYCLE day:',
                 visit1Date: 'Date of Visit 1:',
-                progesteroneStartDayLabel: 'Progesterone Start Day (Cycle Day):',
+                progesteroneStartDayLabel: 'Visit 3 Day (Cycle Day):',
                 saveProject: 'Save Project',
                 loadProject: 'Open Timeline to Edit',
                 saveSuccess: 'Saved successfully!',
@@ -744,7 +744,7 @@
                 sundayWarning: 'คำเตือน: วันนัดต่อไปนี้ตรงกับวันอาทิตย์ (คลินิกปิด):',
                 startDay: 'เริ่มวันที่ (วันที่ของรอบ):',
                 visit1Date: 'วันที่ตรวจครั้งที่ 1:',
-                progesteroneStartDayLabel: 'วันที่เริ่มยาโปรเจสเตอโรน (วันที่ของรอบ):',
+                progesteroneStartDayLabel: 'วันที่มา Visit 3 (วันที่ของรอบ):',
                 saveProject: 'บันทึกโปรเจกต์',
                 loadProject: 'เปิดไทม์ไลน์เพื่อแก้ไข',
                 saveSuccess: 'บันทึกเรียบร้อยแล้ว!',
@@ -2468,7 +2468,7 @@
                                     </div>
                                     {!inputs.eraOraTestDone && (
                                         <div className="md:col-span-2 flex items-end pb-2 text-sm text-gray-500 italic" style={{ fontFamily: "'Anuphan'" }}>
-                                            Visit 4 = Start + 5 days, Visit 5 = Start + 6 days
+                                            Progesterone starts the day after Visit 3. Visit 4 = progesterone start + 5 days, Visit 5 = progesterone start + 6 days
                                         </div>
                                     )}
                                 </div>
@@ -2517,8 +2517,9 @@
             }, [type, patientData.lmp, inputs.protocol, inputs.ovulationDate]);
 
             const handleEtChange = (newDate, newTime) => {
-                const defaultProgStartDay = clampInt(inputs.progesteroneStartDay, 15);
-                const defaultProgStart = addDays(lmpDate, defaultProgStartDay - 1);
+                // progesteroneStartDay holds the Visit 3 cycle day; progesterone starts the day after.
+                const visit3CycleDay = clampInt(inputs.progesteroneStartDay, 15);
+                const defaultProgStart = addDays(lmpDate, visit3CycleDay);
                 const receptivityHours = parseFloat(inputs.eraOraHours !== undefined ? inputs.eraOraHours : '144');
                 const defaultEt = addDays(defaultProgStart, Math.round(receptivityHours / 24));
                 
@@ -2539,8 +2540,9 @@
             };
 
             const handleProgChange = (newDate, newTime) => {
-                const defaultProgStartDay = clampInt(inputs.progesteroneStartDay, 15);
-                const defaultProgStart = addDays(lmpDate, defaultProgStartDay - 1);
+                // progesteroneStartDay holds the Visit 3 cycle day; progesterone starts the day after.
+                const visit3CycleDay = clampInt(inputs.progesteroneStartDay, 15);
+                const defaultProgStart = addDays(lmpDate, visit3CycleDay);
                 
                 const dateStr = newDate !== undefined ? newDate : (inputs.progStartDate || toISODate(defaultProgStart));
                 const timeStr = newTime !== undefined ? newTime : (inputs.progStartTime || '08:00');
@@ -3189,20 +3191,25 @@
                 });
             }, [applied.medicationBars, barsStartX, remainingWidthForBars, stdBarWidth, adjustY, lmpDate]);
 
-            // Helper: render a DOM element to JPEG data URL at 3x resolution
-            const renderPageImage = (pageElement) => {
+            // Helper: render a DOM element to JPEG data URL at 3x resolution.
+            // Default is the A4 page (794x1123); { width, autoHeight: true } is used for the
+            // patient phone copy, whose height follows its content.
+            const renderPageImage = (pageElement, opts = {}) => {
                 return new Promise((resolve, reject) => {
                     const node = pageElement.cloneNode(true);
                     node.removeAttribute('id');
-                    const isLandscape = false;
-                    const wVal = 794;
-                    const hVal = 1123;
+                    const wVal = opts.width || 794;
+                    let hVal = 1123;
                     Object.assign(node.style, {
                         position: 'fixed', left: '0', top: '0', zIndex: '-9999',
                         display: 'block', visibility: 'visible', transform: 'none',
-                        width: wVal + 'px', height: hVal + 'px', overflow: 'hidden'
+                        width: wVal + 'px', height: opts.autoHeight ? 'auto' : hVal + 'px', overflow: 'hidden'
                     });
                     document.body.appendChild(node);
+                    if (opts.autoHeight) {
+                        hVal = Math.ceil(node.scrollHeight);
+                        node.style.height = hVal + 'px';
+                    }
                     requestAnimationFrame(() => {
                         const sf = 3;
                         domtoimage.toJpeg(node, {
@@ -3215,6 +3222,9 @@
                     });
                 });
             };
+
+            // Patient JPG: the phone-layout calendar (see CalendarPage variant 'mobile').
+            const renderMobileJpg = (el) => renderPageImage(el, el.id === 'print-mobile' ? { width: MOBILE_CAL_WIDTH, autoHeight: true } : {});
 
             const getFilename = () => {
                 const hn = (patientData.hn || '').trim();
@@ -3263,9 +3273,9 @@
                 const filename = getFilename();
                 document.fonts.ready.then(async () => {
                     try {
-                        const p1 = document.getElementById('print-page1');
-                        if (!p1) return;
-                        const page1Url = await renderPageImage(p1);
+                        const pm = document.getElementById('print-mobile') || document.getElementById('print-page1');
+                        if (!pm) return;
+                        const page1Url = await renderMobileJpg(pm);
                         fetch('http://localhost:8012/api/save', {
                             method: 'POST',
                             body: JSON.stringify({ type: 'jpg', filename, content: page1Url }),
@@ -3297,15 +3307,17 @@
                         let page2Url = null;
                         if (p2) page2Url = await renderPageImage(p2);
 
-                        // Save JPG (page 1 only - patient copy)
+                        // Save JPG (patient copy, phone layout)
+                        const pm = document.getElementById('print-mobile');
+                        const jpgUrl = pm ? await renderMobileJpg(pm) : page1Url;
                         fetch('http://localhost:8012/api/save', {
                             method: 'POST',
-                            body: JSON.stringify({ type: 'jpg', filename, content: page1Url }),
+                            body: JSON.stringify({ type: 'jpg', filename, content: jpgUrl }),
                             headers: { 'Content-Type': 'application/json' }
                         }).catch(() => {
                             const link = document.createElement('a');
                             link.download = `${filename}.jpg`;
-                            link.href = page1Url;
+                            link.href = jpgUrl;
                             link.click();
                         });
 
@@ -3463,8 +3475,9 @@
                                 const lmp = patientData.lmp ? new Date(patientData.lmp) : new Date();
                                 lmp.setHours(12, 0, 0, 0);
                                 
-                                const defaultProgStartDay = clampInt(inputs.progesteroneStartDay, 15);
-                                const defaultProgStart = toISODate(addDays(lmp, defaultProgStartDay - 1));
+                                // progesteroneStartDay holds the Visit 3 cycle day; progesterone starts the day after.
+                                const visit3CycleDay = clampInt(inputs.progesteroneStartDay, 15);
+                                const defaultProgStart = toISODate(addDays(lmp, visit3CycleDay));
                                 const defaultProgStartTime = '08:00';
                                 
                                 const receptivityHours = parseFloat(inputs.eraOraHours !== undefined ? inputs.eraOraHours : '144');
@@ -3681,6 +3694,18 @@
                             >
                                 <div id="print-page2" className="w-full h-full relative">
                                     <OrdersPage type={type} patientData={patientData} inputs={inputs} applied={applied} t={t} language={language} lmpDate={lmpDate} edits={edits} handleFieldClick={handleFieldClick} />
+                                </div>
+                            </div>
+
+                            {/* Patient phone copy: this is what "Save as JPG" / "Save All" saves as the JPG */}
+                            <div className="shrink-0 flex flex-col items-center">
+                                <div className="text-sm font-semibold text-gray-600 mb-2" style={{ fontFamily: "'Anuphan'" }}>
+                                    {language === 'th' ? 'สำเนาสำหรับผู้ป่วย (มือถือ, บันทึกเป็น JPG)' : 'Patient phone copy (saved as JPG)'}
+                                </div>
+                                <div className="bg-white shadow-lg" style={{ width: `${MOBILE_CAL_WIDTH}px`, zoom: previewScale }}>
+                                    <div id="print-mobile" className="relative">
+                                        <CalendarPage type={type} patientData={patientData} inputs={inputs} applied={applied} t={t} language={language} lmpDate={lmpDate} edits={edits} variant="mobile" />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4403,7 +4428,13 @@
         // ==========================================
         // CALENDAR PAGE (Print Page 1 - Patient Copy)
         // ==========================================
-        function CalendarPage({ type, patientData, inputs, applied, t, language, lmpDate, edits }) {
+        // variant 'a4': the 794x1123 print page (PDF / print). Text shrinks only if the cycle
+        // would overflow the page.
+        // variant 'mobile': the patient JPG. A narrower page that grows in height, so a phone
+        // shows it at a larger scale and the text is never shrunk.
+        const MOBILE_CAL_WIDTH = 600;
+        function CalendarPage({ type, patientData, inputs, applied, t, language, lmpDate, edits, variant = 'a4' }) {
+            const isMobile = variant === 'mobile';
             const medColorPalette = [
                 { bg: '#dcfce7', border: '#065f46', text: '#065f46' }, // Emerald
                 { bg: '#fce7f3', border: '#9d174d', text: '#9d174d' }, // Ruby
@@ -4434,9 +4465,13 @@
             const dow = d1.getDay(); // 0=Sun
             const startOff = dow; // days to Sunday
             const totalWeeks = Math.ceil((maxDay + startOff) / 7);
-            const dayLabels = language === 'th'
-                ? ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
-                : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayLabels = isMobile
+                ? (language === 'th'
+                    ? ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
+                    : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])
+                : (language === 'th'
+                    ? ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
+                    : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
 
             const allMeds = applied.medicationBars || [];
             const triggerMeds = allMeds.filter(m => m.id && m.id.includes('trigger'));
@@ -4503,26 +4538,59 @@
                 }
             }
 
-            // Adjust heights for Portrait A4 (794 x 1123) to fit exactly on 1 page
-            const ch = totalWeeks <= 4 ? 190 : totalWeeks <= 5 ? 150 : 125;
-            const fsDate = totalWeeks <= 4 ? 24 : 20; // Date number (reduced from 30/26 to prevent overlap)
-            const fsBody = totalWeeks <= 4 ? 12 : 11; // Body text (reduced from 14/12)
-            const fsDay = totalWeeks <= 4 ? 11 : 10; // Cycle day font size (reduced from 13/11)
-            const barHeight = fsBody + 4; // Height of continuous med bar
-            const barSpacing = barHeight + 1; // Spacing between tracks (1px gap)
+            // Text is sized so the saved JPG stays readable on a phone, where the A4 page is
+            // shown at roughly half size. `fit` starts at full size and steps down only when a
+            // busy cycle would overflow the page (see the layout effect below).
+            const MIN_FIT = 0.55;
+            const [fit, setFit] = useState(1);
+            const [fontsReady, setFontsReady] = useState(false);
+            const gridRef = React.useRef(null);
+            const fitKeyRef = React.useRef(null);
+            useEffect(() => {
+                let alive = true;
+                if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (alive) setFontsReady(true); });
+                return () => { alive = false; };
+            }, []);
+            const layoutKey = JSON.stringify([type, language, applied.visits, applied.medicationBars, totalWeeks, fontsReady]);
+            React.useLayoutEffect(() => {
+                // New content: start again from full size.
+                if (fitKeyRef.current !== layoutKey) {
+                    fitKeyRef.current = layoutKey;
+                    if (fit !== 1) { setFit(1); return; }
+                }
+                const el = gridRef.current;
+                if (!isMobile && el && el.scrollHeight > el.clientHeight + 1 && fit > MIN_FIT) {
+                    setFit(Math.max(MIN_FIT, Math.round((fit - 0.02) * 100) / 100));
+                }
+            });
+            const scale = isMobile ? 1 : fit;
+            const px = (n) => (Math.round(n * scale * 10) / 10) + 'px';
+            // The phone copy has narrower columns, so its date and visit name are a bit smaller.
+            const fsDate = isMobile ? 28 : 30;  // Date number
+            const fsCd = isMobile ? 12 : 13;    // Cycle day
+            const fsVisit = isMobile ? 17 : 18; // Visit name
+            const fsDetail = 15;  // Visit details
+            const fsBar = 16;     // Medication bars
+            const fsWeekday = 16; // Day-of-week header
+            // Year is already in the month title, so "16/09/2026 08:00" shows as "16/09 08:00" in the cells.
+            const cleanDetail = (dd) => (typeof dd === 'string'
+                ? dd.replace(/_{3,}/g, '___').replace(/\b(\d{1,2}\/\d{1,2})\/\d{4}\b/g, '$1')
+                : dd);
+            // Keep "Visit 3" together when the label wraps.
+            const visitLabel = (label) => String(label).replace(/ (\d+)$/, '\u00A0$1');
 
             return (
-                <div style={{ width: '794px', height: '1123px', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden', ...fnt, position: 'relative' }}>
+                <div lang={language === 'th' ? 'th' : 'en'} style={{ width: (isMobile ? MOBILE_CAL_WIDTH : 794) + 'px', height: isMobile ? 'auto' : '1123px', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden', ...fnt, position: 'relative' }}>
                     {/* Header */}
                     <div style={{ padding: '16px 32px 8px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '6px' }}>
                             <div style={{ height: '3px', flex: 1, background: 'linear-gradient(90deg, transparent, #0F52BA)' }}></div>
-                            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#151667', margin: 0, whiteSpace: 'nowrap', fontFamily: "'Kanit', sans-serif" }}>
+                            <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#151667', margin: 0, whiteSpace: 'nowrap', fontFamily: "'Kanit', sans-serif" }}>
                                 {applied.title}
                             </h2>
                             <div style={{ height: '3px', flex: 1, background: 'linear-gradient(90deg, #0F52BA, transparent)' }}></div>
                         </div>
-                        <div style={{ fontSize: '14px', color: '#374151', lineHeight: 1.4 }}>
+                        <div style={{ fontSize: '15px', color: '#374151', lineHeight: 1.4 }}>
                             <div>
                                 <b>{t.name}</b> {patientData.name} {patientData.lastName}
                                 <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
@@ -4568,247 +4636,180 @@
                     </div>
 
                     {/* Month Title */}
-                    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                        <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0F52BA', fontFamily: "'Kanit', sans-serif", margin: 0 }}>
+                    <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+                        <h3 style={{ fontSize: '24px', fontWeight: 700, color: '#0F52BA', fontFamily: "'Kanit', sans-serif", margin: 0 }}>
                             {monthHeaderStr}
                         </h3>
                     </div>
 
                     {/* Calendar Grid Wrapper */}
-                    <div style={{ padding: '0 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        
+                    <div style={{ padding: isMobile ? '0 4px 8px' : '0 16px', flex: isMobile ? 'none' : 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+
                         {/* Day of Week Headers */}
-                        <div style={{ display: 'flex', borderBottom: '3px solid #0F52BA', marginBottom: '4px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '3px solid #0F52BA', marginBottom: '4px' }}>
                             {dayLabels.map((label, i) => (
                                 <div key={i} style={{
-                                    width: '14.2857%',
-                                    minWidth: '14.2857%',
-                                    boxSizing: 'border-box',
                                     padding: '4px 2px',
-                                    fontSize: '13px',
+                                    fontSize: px(fsWeekday),
                                     fontWeight: 800,
                                     color: i === 0 ? '#e0115f' : '#151667',
-                                    textAlign: 'center'
+                                    textAlign: 'center',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden'
                                 }}>
                                     {label}
                                 </div>
                             ))}
                         </div>
 
-                        {/* Weeks */}
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            {weeks.map((wkData, wi) => (
-                                <div key={wi} style={{ position: 'relative', display: 'flex', height: ch + 'px' }}>
-                                    
-                                    {/* 1) Background & Text Cells */}
+                        {/* Weeks. Each week is a CSS grid: row 1 holds the date and visit text,
+                            then one row per medication track, then a filler row. Visit text and
+                            medication bars sit in separate rows, so they can never overlap. */}
+                        <div ref={gridRef} style={{ flex: isMobile ? 'none' : 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: isMobile ? 'visible' : 'hidden' }}>
+                            {weeks.map((wkData, wi) => {
+                                const trackCount = wkData.activeWeekMeds.reduce((mx, m) => Math.max(mx, m.track + 1), 0);
+                                const rowTemplate = ['auto', trackCount ? `repeat(${trackCount}, auto)` : '', `minmax(${px(4)}, 1fr)`].filter(Boolean).join(' ');
+                                return (
+                                <div key={wi} style={{ flex: isMobile ? '0 0 auto' : '1 0 auto', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gridTemplateRows: rowTemplate }}>
+
+                                    {/* 1) Cell backgrounds and borders (span the whole week row) */}
                                     {wkData.days.map((c, di) => {
-                                        if (!c) {
-                                            return <div key={di} style={{ width: '14.2857%', minWidth: '14.2857%', boxSizing: 'border-box', borderRight: di<6 ? '1px solid #e5e7eb' : 'none', borderBottom: '1px solid #e5e7eb', background: '#fafafa' }}></div>;
-                                        }
-                                        if (c.empty) {
-                                            return (
-                                                <div key={di} style={{ width: '14.2857%', minWidth: '14.2857%', boxSizing: 'border-box', borderRight: di<6 ? '1px solid #e5e7eb' : 'none', borderBottom: '1px solid #e5e7eb', background: '#fafafa', position: 'relative', padding: '8px' }}>
-                                                    {/* BIG Date Top-Right */}
-                                                    <div style={{ position: 'absolute', top: '8px', right: '8px', fontSize: (c.dt.getDate() === 1 ? fsDate - 4 : fsDate) + 'px', fontWeight: 800, color: '#151667', lineHeight: 1 }}>
-                                                        {getDateLabel(c.dt)}
-                                                    </div>
-                                                </div>
-                                            );
+                                        const base = { gridColumn: di + 1, gridRow: '1 / -1', boxSizing: 'border-box', position: 'relative', borderBottom: '1px solid #e5e7eb' };
+                                        if (!c || c.empty) {
+                                            return <div key={`bg-${di}`} style={{ ...base, borderRight: di < 6 ? '1px solid #e5e7eb' : 'none', background: '#fafafa' }}></div>;
                                         }
                                         const hv = !!c.vis;
-                                        const isM = c.vis && c.vis.id.endsWith('-v1');
                                         const isLab = c.vis && (c.vis.id === 'opu-v5' || c.vis.id === 'fet-v6' || c.vis.id === 'duo-p2-v5' || c.vis.id === 'opu-v-et');
                                         const borderColor = c.isSun ? '#f5a3c0' : hv ? '#0F52BA' : '#a3b8e8';
                                         const bgColor = c.isSun ? '#fdf0f4' : isLab ? '#e6f5ef' : hv ? '#e8edf8' : '#ffffff';
-                                        
                                         return (
-                                            <div key={di} style={{
-                                                width: '14.2857%',
-                                                minWidth: '14.2857%',
-                                                boxSizing: 'border-box',
-                                                borderRight: di<6 ? `1px solid ${borderColor}` : 'none',
-                                                borderBottom: '1px solid #e5e7eb',
-                                                borderTop: hv ? `2px solid ${borderColor}` : 'none',
-                                                background: bgColor,
-                                                position: 'relative',
-                                                padding: '8px',
-                                                zIndex: isLab ? 20 : 1
-                                            }}>
-                                                {isLab ? (
-                                                    <div style={{
-                                                        position: 'absolute',
-                                                        top: '4px',
-                                                        left: '4px',
-                                                        right: '4px',
-                                                        bottom: '4px',
-                                                        backgroundColor: '#e6f5ef',
-                                                        border: `2.5px solid #009473`,
-                                                        borderRadius: '6px',
-                                                        padding: '6px',
-                                                        zIndex: 15,
-                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        justifyContent: 'space-between',
-                                                        textAlign: 'left'
-                                                    }}>
-                                                        {/* Top Row: Icon + Label (Left), Date (Right) */}
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                                                            <div style={{ fontSize: fsBody + 'px', fontWeight: 900, color: '#009473', maxWidth: '75%', lineHeight: 1.1 }}>
-                                                                🔬 {c.vis.label}
-                                                            </div>
-                                                            <div style={{ fontSize: fsDate + 'px', fontWeight: 900, color: '#009473', lineHeight: 0.9 }}>
-                                                                {getDateLabel(c.dt)}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Middle Row: Details */}
-                                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: '4px 0' }}>
-                                                            {c.vis.details && c.vis.details.map((dd, idx) => (
-                                                                <div key={idx} style={{ fontSize: (fsBody - 1) + 'px', color: '#065f46', fontWeight: 800, lineHeight: 1.2 }}>
-                                                                    {typeof dd === 'string' ? dd.replace(/_{3,}/g, '___') : dd}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-
-                                                        {/* Bottom Row: Cycle Day */}
-                                                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'end' }}>
-                                                            <div style={{ fontSize: fsDay + 'px', fontWeight: 700, color: '#009473', opacity: 0.8 }}>
-                                                                [{t.day} {c.cd}]
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        {/* BIG Date Top-Right */}
-                                                        <div style={{ position: 'absolute', top: '8px', right: '8px', fontSize: fsDate + 'px', fontWeight: 800, color: '#151667', lineHeight: 1 }}>
-                                                            {getDateLabel(c.dt)}
-                                                        </div>
-
-                                                        {/* Visit Info (Top-Left) */}
-                                                        {hv && (
-                                                            <div style={{
-                                                                textAlign: 'left',
-                                                                fontSize: fsBody + 'px',
-                                                                fontWeight: 800,
-                                                                color: isM ? '#e0115f' : '#151667',
-                                                                lineHeight: 1.2,
-                                                                maxWidth: '68%'
-                                                            }}>
-                                                                <div>{isM ? '🔴' : '⭐'} {c.vis.label}</div>
-                                                                {!isM && c.vis.details && c.vis.details.map((dd, idx) => (
-                                                                    <div key={idx} style={{ fontSize: (fsBody-2)+'px', color: '#4b5563', fontWeight: 500, marginTop: '2px' }}>
-                                                                        {typeof dd === 'string' ? dd.replace(/_{3,}/g, '___') : dd}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Cycle Day at Bottom Center/Right in Grey */}
-                                                        <div style={{
-                                                            position: 'absolute',
-                                                            bottom: '8px',
-                                                            right: '8px',
-                                                            fontSize: fsDay + 'px',
-                                                            fontWeight: 600,
-                                                            color: '#9ca3af'
-                                                        }}>
-                                                            [{t.day} {c.cd}]
-                                                        </div>
-
-                                                        {/* Trigger (Bottom-Left) */}
-                                                        {c.hasTrigger && (
-                                                            <div style={{
-                                                                position: 'absolute',
-                                                                bottom: '4px',
-                                                                left: '4px',
-                                                                right: '4px',
-                                                                backgroundColor: '#009473',
-                                                                borderLeft: `4px solid #f59e0b`,
-                                                                color: '#ffffff',
-                                                                padding: '4px 6px',
-                                                                fontSize: (fsBody - 1) + 'px',
-                                                                fontWeight: 800,
-                                                                borderRadius: '4px',
-                                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                                                zIndex: 5,
-                                                                lineHeight: 1.2,
-                                                            }}>
-                                                                {triggerMeds.filter(m => c.cd >= m.startDay && c.cd <= m.endDay).map((m, idx) => {
-                                                                    const parts = m.label.split('\n');
-                                                                    const medName = parts[0] || m.shortName;
-                                                                    const timePart = parts[1] || '';
-                                                                    return (
-                                                                        <div key={idx}>
-                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800' }}>
-                                                                                <span>⚡</span>
-                                                                                <span>{medName}</span>
-                                                                            </div>
-                                                                            {timePart && (
-                                                                                <div style={{ 
-                                                                                    fontSize: (fsBody - 1) + 'px', 
-                                                                                    fontWeight: '900', 
-                                                                                    color: '#fef08a', 
-                                                                                    marginTop: '2px',
-                                                                                    borderTop: '1px dashed rgba(255,255,255,0.3)',
-                                                                                    paddingTop: '2px'
-                                                                                }}>
-                                                                                    {timePart}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </>
+                                            <div key={`bg-${di}`} style={{ ...base, borderRight: di < 6 ? `1px solid ${borderColor}` : 'none', borderTop: hv ? `2px solid ${borderColor}` : 'none', background: bgColor }}>
+                                                {isLab && (
+                                                    <div style={{ position: 'absolute', top: '3px', left: '3px', right: '3px', bottom: '3px', border: '2.5px solid #009473', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' }}></div>
                                                 )}
                                             </div>
                                         );
                                     })}
 
-                                    {/* 2) Continuous Medication Bars (Overlaid) */}
-                                    <div style={{ position: 'absolute', top: (totalWeeks <= 4 ? 78 : totalWeeks <= 5 ? 66 : 62) + 'px', left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 10 }}>
-                                        {wkData.activeWeekMeds.map((m, idx) => {
-                                            const trackIdx = typeof m.track === 'number' && !isNaN(m.track) ? m.track : 0;
-                                            const colorObj = medColorPalette[trackIdx % medColorPalette.length] || medColorPalette[0];
-                                            const leftPct = (m.startCol / 7) * 100;
-                                            const widthPct = (m.span / 7) * 100;
-                                            // Make it span precisely across the cells by using absolute positioning
-                                            return (
-                                                <div key={`med-${wi}-${idx}`} style={{
-                                                    position: 'absolute',
-                                                    left: `calc(${leftPct}% + 4px)`,
-                                                    width: `calc(${widthPct}% - 8px)`,
-                                                    top: `${m.track * barSpacing}px`,
-                                                    height: `${barHeight}px`,
-                                                    backgroundColor: colorObj.bg,
-                                                    borderLeft: `4px solid ${colorObj.border}`,
-                                                    color: colorObj.text,
-                                                    padding: '0 6px',
-                                                    fontSize: fsBody + 'px',
-                                                    fontWeight: 600,
-                                                    borderRadius: '4px',
-                                                    whiteSpace: 'nowrap',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                                    display: 'flex',
-                                                    alignItems: 'center'
-                                                }}>
-                                                    {m.label} {m.dose}
+                                    {/* 2) Date, cycle day, visit and trigger text (row 1) */}
+                                    {wkData.days.map((c, di) => {
+                                        if (!c) return null;
+                                        const isFirstOfMonth = c.dt.getDate() === 1;
+                                        const hv = !c.empty && !!c.vis;
+                                        const isM = hv && c.vis.id.endsWith('-v1');
+                                        const isLab = hv && (c.vis.id === 'opu-v5' || c.vis.id === 'fet-v6' || c.vis.id === 'duo-p2-v5' || c.vis.id === 'opu-v-et');
+                                        const accent = isLab ? '#009473' : '#151667';
+                                        return (
+                                            <div key={`ct-${di}`} style={{ gridColumn: di + 1, gridRow: 1, position: 'relative', zIndex: 2, minWidth: 0, padding: isLab ? `${px(8)} ${px(isMobile ? 7 : 9)} ${px(4)}` : `${px(5)} ${px(isMobile ? 3 : 5)} ${px(3)}`, textAlign: 'left' }}>
+                                                {/* Date (right) and cycle day (left); the cycle day wraps below if both do not fit */}
+                                                <div style={{ display: 'flex', flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: '2px' }}>
+                                                    <div style={{ fontSize: px(isFirstOfMonth ? fsDate - 8 : fsDate), fontWeight: isLab ? 900 : 800, color: accent, lineHeight: 1, whiteSpace: 'nowrap' }}>
+                                                        {getDateLabel(c.dt)}
+                                                    </div>
+                                                    {!c.empty && (
+                                                        <div style={{ fontSize: px(fsCd), fontWeight: 700, color: isLab ? '#009473' : '#9ca3af', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                                                            {t.day} {c.cd}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
+
+                                                {hv && (
+                                                    <div style={{ marginTop: px(4), overflowWrap: 'break-word', hyphens: 'auto', WebkitHyphens: 'auto' }}>
+                                                        <div style={{ fontSize: px(fsVisit), fontWeight: 900, color: isM ? '#e0115f' : accent, lineHeight: 1.15 }}>
+                                                            <span style={{ fontSize: '0.85em', marginRight: '2px' }}>{isM ? '🔴' : isLab ? '🔬' : '⭐'}</span>{'\u200B'}{visitLabel(c.vis.label)}
+                                                        </div>
+                                                        {!isM && c.vis.details && c.vis.details.map((dd, idx) => (
+                                                            <div key={idx} style={{ fontSize: px(fsDetail), color: isLab ? '#065f46' : '#374151', fontWeight: isLab ? 800 : 600, lineHeight: 1.15, marginTop: px(2) }}>
+                                                                {cleanDetail(dd)}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {c.hasTrigger && (
+                                                    <div style={{
+                                                        marginTop: px(5),
+                                                        backgroundColor: '#009473',
+                                                        borderLeft: `4px solid #f59e0b`,
+                                                        color: '#ffffff',
+                                                        padding: `${px(4)} ${px(6)}`,
+                                                        fontSize: px(fsDetail),
+                                                        fontWeight: 800,
+                                                        borderRadius: '4px',
+                                                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                        lineHeight: 1.2,
+                                                        overflowWrap: 'anywhere'
+                                                    }}>
+                                                        {triggerMeds.filter(m => c.cd >= m.startDay && c.cd <= m.endDay).map((m, idx) => {
+                                                            const parts = m.label.split('\n');
+                                                            const medName = parts[0] || m.shortName;
+                                                            const timePart = cleanDetail(parts[1] || '');
+                                                            return (
+                                                                <div key={idx}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800' }}>
+                                                                        <span>⚡</span>
+                                                                        <span>{medName}</span>
+                                                                    </div>
+                                                                    {timePart && (
+                                                                        <div style={{
+                                                                            fontWeight: '900',
+                                                                            color: '#fef08a',
+                                                                            marginTop: '2px',
+                                                                            borderTop: '1px dashed rgba(255,255,255,0.3)',
+                                                                            paddingTop: '2px'
+                                                                        }}>
+                                                                            {timePart}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* 3) Continuous medication bars, one grid row per track */}
+                                    {wkData.activeWeekMeds.map((m, idx) => {
+                                        const trackIdx = typeof m.track === 'number' && !isNaN(m.track) ? m.track : 0;
+                                        const colorObj = medColorPalette[trackIdx % medColorPalette.length] || medColorPalette[0];
+                                        const [medName, ...doseLines] = String(m.label || m.shortName || '').split('\n');
+                                        const doseText = [doseLines.join(' '), m.dose].filter(Boolean).join(' ');
+                                        return (
+                                            <div key={`med-${wi}-${idx}`} style={{
+                                                gridColumn: `${m.startCol + 1} / span ${m.span}`,
+                                                gridRow: trackIdx + 2,
+                                                position: 'relative',
+                                                zIndex: 3,
+                                                minWidth: 0,
+                                                margin: `0 ${px(4)} ${px(2)}`,
+                                                backgroundColor: colorObj.bg,
+                                                borderLeft: `4px solid ${colorObj.border}`,
+                                                color: colorObj.text,
+                                                padding: `${px(1)} ${px(6)}`,
+                                                fontSize: px(fsBar),
+                                                fontWeight: 600,
+                                                lineHeight: 1.15,
+                                                borderRadius: '4px',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                            }}>
+                                                <span style={{ fontWeight: 800 }}>{medName}</span>{doseText ? ` ${doseText}` : ''}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 
                     {/* Footer Section (Restored & Integrated) */}
                     <div style={{
-                        padding: '8px 32px 12px',
+                        padding: '6px 24px 8px',
                         borderTop: '1px solid #e5e7eb',
                         marginTop: 'auto',
                         background: '#fafafa',
@@ -4816,10 +4817,10 @@
                         flexDirection: 'column',
                         gap: '4px'
                     }}>
-                        <div style={{ textAlign: 'center', fontSize: '9.5px', color: '#6b7280', fontStyle: 'italic' }}>
+                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>
                             {language === 'th' ? t.cycleNoteTh : t.cycleNoteEn}
                         </div>
-                        <div style={{ textAlign: 'center', fontSize: '9.5px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
+                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
                             <div>{t.disclaimerEn}</div>
                             <div>{t.disclaimerTh}</div>
                         </div>
@@ -5674,8 +5675,9 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                 const lmpDate = patientData.lmp ? new Date(patientData.lmp) : new Date();
                 lmpDate.setHours(12, 0, 0, 0);
 
-                let defaultProgStartDay = clampInt(inputs.progesteroneStartDay, 15);
-                const defaultProgStart = toISODate(addDays(lmpDate, defaultProgStartDay - 1));
+                // progesteroneStartDay holds the Visit 3 cycle day; progesterone starts the day after.
+                const visit3CycleDay = clampInt(inputs.progesteroneStartDay, 15);
+                const defaultProgStart = toISODate(addDays(lmpDate, visit3CycleDay));
                 const defaultProgStartTime = '08:00';
 
                 const receptivityHours = parseFloat(inputs.eraOraHours !== undefined ? inputs.eraOraHours : '144');
