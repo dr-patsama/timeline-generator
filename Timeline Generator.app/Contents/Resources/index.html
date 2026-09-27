@@ -2845,11 +2845,8 @@
                     setStart('fet-m1', 'fet-v2');
                     setStart('fet-m2', 'fet-v3');
 
-                    // Meds from manual input (already set in buildTimelineBase, but ensuring persistence if visits move)
-                    const progStart = getDayByVid('fet-v4') + 1; // Default expectation
-                    // However, we want them linked to the manual input primarily.
-                    // If the user hasn't edited the med specifically, buildTimelineBase already handled it.
-                    // We don't force them TO visit 4 anymore as they are "1 day after".
+                    // Progesterone-phase bars (fet-m3..m5) follow the Progesterone Start input set in
+                    // buildTimelineBase, which is the day after Visit 3 (fet-v4); they are not pinned to the visit.
 
                     // Force all FET medication bars to end at the final visit (fet-v7).
                     activeBase.medicationBars.forEach((m) => setEnd(m.id, 'fet-v7'));
@@ -5702,6 +5699,8 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                 progStart = Math.max(1, progStart);
                 etDay = Math.max(1, etDay);
                 let pregDay = etDay + 7;
+                // Visit 3 (TVS, schedule ET) is the day before progesterone starts.
+                const visit3Day = Math.max(1, progStart - 1);
 
                 const detailsV4 = [t.tvs, t.startProgesterone, t.scheduleEt];
                 const detailsV6 = [t.embryoTransfer];
@@ -5730,7 +5729,7 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                     { id: 'fet-v1', day: 1, label: t.menses, details: [] },
                     { id: 'fet-v2', day: 3, label: `${t.visit} 1`, details: [t.tvs, t.hormonePreparation] },
                     { id: 'fet-v3', day: 11, label: `${t.visit} 2`, details: [t.tvs] },
-                    { id: 'fet-v4', day: progStart, label: `${t.visit} 3`, details: detailsV4 },
+                    { id: 'fet-v4', day: visit3Day, label: `${t.visit} 3`, details: detailsV4 },
                     { id: 'fet-v5', day: etDay - 1, label: `${t.visit} 4`, details: [t.serumProg] },
                     { id: 'fet-v6', day: etDay, label: `${t.visit} 5`, details: detailsV6 },
                     { id: 'fet-v7', day: pregDay, label: `${t.visit} 6`, details: [t.pregnancyTest] },
