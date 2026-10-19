@@ -4451,7 +4451,6 @@
                 { bg: '#ccfbf1', border: '#134e4a', text: '#134e4a' }, // Teal
             ];
             const fnt = { fontFamily: "'Anuphan', sans-serif" };
-            const pair = { whiteSpace: 'nowrap' };
             const getDateLabel = (date) => {
                 const dayNum = date.getDate();
                 if (dayNum === 1) {
@@ -4575,9 +4574,7 @@
             const fsDate = isMobile ? 28 : 30;  // Date number
             const fsCd = isMobile ? 12 : 13;    // Cycle day
             const fsVisit = isMobile ? 17 : 18; // Visit name
-            // Phone columns are narrow, so visit details are a little smaller there (a long
-            // Latin word such as "Progesterone" is also fitted by fitLongWords below).
-            const fsDetail = isMobile ? 14 : 15;  // Visit details
+            const fsDetail = 15;  // Visit details
             const fsBar = 16;     // Medication bars
             const fsWeekday = 16; // Day-of-week header
             // Year is already in the month title, so "16/09/2026 08:00" shows as "16/09 08:00" in the cells.
@@ -4586,15 +4583,6 @@
                 : dd);
             // Keep "Visit 3" together when the label wraps.
             const visitLabel = (label) => String(label).replace(/ (\d+)$/, '\u00A0$1');
-            // Phone copy only: a long Latin word such as "Progesterone" is wider than a phone
-            // cell at the detail size, so it is set slightly smaller and stays whole instead of
-            // being broken at a random letter. Thai text keeps its own dictionary line-breaking.
-            const fitLongWords = (text) => {
-                if (!isMobile || typeof text !== 'string') return text;
-                return text.split(/([A-Za-z]{11,})/).map((part, i) =>
-                    /^[A-Za-z]{11,}$/.test(part) ? <span key={i} style={{ fontSize: '0.88em' }}>{part}</span> : part
-                );
-            };
 
             return (
                 <div lang={language === 'th' ? 'th' : 'en'} style={{ width: (isMobile ? MOBILE_CAL_WIDTH : 794) + 'px', height: isMobile ? 'auto' : '1123px', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden', ...fnt, position: 'relative' }}>
@@ -4609,49 +4597,43 @@
                         </div>
                         <div style={{ fontSize: '15px', color: '#1f2937', lineHeight: 1.4 }}>
                             <div>
-                                {/* Each "label: value" pair stays on one line, so a label is never
-                                    separated from its value when this line wraps on the phone copy.
-                                    The spaces around each separator are the only places the line
-                                    may wrap (a nowrap span next to a separator gives no break point). */}
-                                <span style={pair}><b>{t.name}</b> {patientData.name} {patientData.lastName}</span>
-                                {' '}<span style={{ margin: '0 4px', color: '#9ca3af' }}>|</span>{' '}
-                                <span style={pair}><b>{t.hn}</b> {patientData.hn}</span>
-                                {' '}<span style={{ margin: '0 4px', color: '#9ca3af' }}>|</span>{' '}
-                                <span style={pair}>
-                                    <b>
-                                        {type === 'opu' && inputs.protocol === 'Luteal stimulation'
-                                            ? (language === 'th' ? 'วันที่ OPU / วันตกไข่ (Day 1):' : 'Date of OPU / Ovulation (Day 1):')
-                                            : t.lmp}
-                                    </b> {type === 'opu' && inputs.protocol === 'Luteal stimulation' ? formatDate(inputs.ovulationDate) : formatDate(patientData.lmp)}
-                                </span>
+                                <b>{t.name}</b> {patientData.name} {patientData.lastName}
+                                <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
+                                <b>{t.hn}</b> {patientData.hn}
+                                <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
+                                <b>
+                                    {type === 'opu' && inputs.protocol === 'Luteal stimulation'
+                                        ? (language === 'th' ? 'วันที่ OPU / วันตกไข่ (Day 1):' : 'Date of OPU / Ovulation (Day 1):')
+                                        : t.lmp}
+                                </b> {type === 'opu' && inputs.protocol === 'Luteal stimulation' ? formatDate(inputs.ovulationDate) : formatDate(patientData.lmp)}
                                 {patientData.pmp && (
                                     <span>
-                                        {' '}<span style={{ margin: '0 4px', color: '#9ca3af' }}>|</span>{' '}
-                                        <span style={pair}><b>{t.pmp}</b> {formatDate(patientData.pmp)}</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
+                                        <b>{t.pmp}</b> {formatDate(patientData.pmp)}
                                     </span>
                                 )}
                                 {patientData.cycleLength && (
                                     <span>
-                                        {' '}<span style={{ margin: '0 4px', color: '#9ca3af' }}>|</span>{' '}
-                                        <span style={pair}><b>{t.cycleLength}</b> {patientData.cycleLength} {language === 'th' ? 'วัน' : 'days'}</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
+                                        <b>{t.cycleLength}</b> {patientData.cycleLength} {language === 'th' ? 'วัน' : 'days'}
                                     </span>
                                 )}
                                 {inputs.protocol && (
                                     <span>
-                                        {' '}<span style={{ margin: '0 4px', color: '#9ca3af' }}>|</span>{' '}
-                                        <span style={pair}><b>{t.protocol}</b> {inputs.protocol}</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
+                                        <b>{t.protocol}</b> {inputs.protocol}
                                     </span>
                                 )}
                                 {type === 'opu' && inputs.pgta !== undefined && (
                                     <span>
-                                        {' '}<span style={{ margin: '0 4px', color: '#9ca3af' }}>|</span>{' '}
-                                        <span style={pair}><b>{t.pgta}</b> {inputs.pgta ? t.yes : t.no}</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
+                                        <b>{t.pgta}</b> {inputs.pgta ? t.yes : t.no}
                                     </span>
                                 )}
                                 {type === 'opu' && inputs.planForEmbryoTransfer !== undefined && (
                                     <span>
-                                        {' '}<span style={{ margin: '0 4px', color: '#9ca3af' }}>|</span>{' '}
-                                        <span style={pair}><b>{t.planForEmbryoTransfer}</b> {inputs.planForEmbryoTransfer ? t.fresh : t.frozen}</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
+                                        <b>{t.planForEmbryoTransfer}</b> {inputs.planForEmbryoTransfer ? t.fresh : t.frozen}
                                     </span>
                                 )}
                             </div>
@@ -4726,7 +4708,7 @@
                                         const isLab = hv && (c.vis.id === 'opu-v5' || c.vis.id === 'fet-v6' || c.vis.id === 'duo-p2-v5' || c.vis.id === 'opu-v-et');
                                         const accent = isLab ? '#065f46' : '#151667';
                                         return (
-                                            <div key={`ct-${di}`} style={{ gridColumn: di + 1, gridRow: 1, position: 'relative', zIndex: 2, minWidth: 0, padding: isLab ? `${px(8)} ${px(isMobile ? 7 : 9)} ${px(4)}` : `${px(5)} ${px(isMobile ? 2 : 5)} ${px(3)}`, textAlign: 'left' }}>
+                                            <div key={`ct-${di}`} style={{ gridColumn: di + 1, gridRow: 1, position: 'relative', zIndex: 2, minWidth: 0, padding: isLab ? `${px(8)} ${px(isMobile ? 7 : 9)} ${px(4)}` : `${px(5)} ${px(isMobile ? 3 : 5)} ${px(3)}`, textAlign: 'left' }}>
                                                 {/* Date (right) and cycle day (left); the cycle day wraps below if both do not fit */}
                                                 <div style={{ display: 'flex', flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: '2px' }}>
                                                     <div style={{ fontSize: px(isFirstOfMonth ? fsDate - 8 : fsDate), fontWeight: isLab ? 900 : 800, color: accent, lineHeight: 1, whiteSpace: 'nowrap' }}>
@@ -4746,7 +4728,7 @@
                                                         </div>
                                                         {!isM && c.vis.details && c.vis.details.map((dd, idx) => (
                                                             <div key={idx} style={{ fontSize: px(fsDetail), color: isLab ? '#065f46' : '#1f2937', fontWeight: isLab ? 800 : 600, lineHeight: 1.15, marginTop: px(2) }}>
-                                                                {fitLongWords(cleanDetail(dd))}
+                                                                {cleanDetail(dd)}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -4758,15 +4740,13 @@
                                                         backgroundColor: '#065f46',
                                                         borderLeft: `4px solid #f59e0b`,
                                                         color: '#ffffff',
-                                                        padding: `${px(4)} ${px(isMobile ? 4 : 6)}`,
+                                                        padding: `${px(4)} ${px(6)}`,
                                                         fontSize: px(fsDetail),
                                                         fontWeight: 800,
                                                         borderRadius: '4px',
                                                         boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
                                                         lineHeight: 1.2,
-                                                        // Break inside a word only as a last resort, so the medication
-                                                        // name is not split mid-word in the narrow phone cells.
-                                                        overflowWrap: 'break-word'
+                                                        overflowWrap: 'anywhere'
                                                     }}>
                                                         {triggerMeds.filter(m => c.cd >= m.startDay && c.cd <= m.endDay).map((m, idx) => {
                                                             const parts = m.label.split('\n');
@@ -4774,10 +4754,9 @@
                                                             const timePart = cleanDetail(parts[1] || '');
                                                             return (
                                                                 <div key={idx}>
-                                                                    {/* The bolt is inline text: as a flex sibling it took width from
-                                                                        the name and forced a mid-word break on the phone copy. */}
-                                                                    <div style={{ fontWeight: '800' }}>
-                                                                        {'⚡ '}{medName}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800' }}>
+                                                                        <span>⚡</span>
+                                                                        <span>{medName}</span>
                                                                     </div>
                                                                     {timePart && (
                                                                         <div style={{
@@ -4822,12 +4801,9 @@
                                                 fontWeight: 600,
                                                 lineHeight: 1.15,
                                                 borderRadius: '4px',
-                                                // The phone copy grows in height, so it wraps the full dose text; the
-                                                // fixed A4 page keeps one line per bar and the orders page has the full text.
-                                                whiteSpace: isMobile ? 'normal' : 'nowrap',
-                                                overflowWrap: 'break-word',
+                                                whiteSpace: 'nowrap',
                                                 overflow: 'hidden',
-                                                textOverflow: isMobile ? 'clip' : 'ellipsis',
+                                                textOverflow: 'ellipsis',
                                                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                             }}>
                                                 <span style={{ fontWeight: 800 }}>{medName}</span>{doseText ? ` ${doseText}` : ''}
