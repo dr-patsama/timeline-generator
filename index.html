@@ -4435,15 +4435,20 @@
         const MOBILE_CAL_WIDTH = 600;
         function CalendarPage({ type, patientData, inputs, applied, t, language, lmpDate, edits, variant = 'a4' }) {
             const isMobile = variant === 'mobile';
+            // Print contrast: this page is rasterised and often printed on a black-and-white
+            // laser printer, so every ink that carries information is dark (roughly 30%
+            // luminance or less) and every grid line is a solid mid-dark grey. The pastel
+            // backgrounds only add colour on screen and on colour prints.
+            const GRID_LINE = '#4b5563';
             const medColorPalette = [
                 { bg: '#dcfce7', border: '#065f46', text: '#065f46' }, // Emerald
                 { bg: '#fce7f3', border: '#9d174d', text: '#9d174d' }, // Ruby
-                { bg: '#fef9c3', border: '#854d0e', text: '#854d0e' }, // Amber
-                { bg: '#e8edf8', border: '#0F52BA', text: '#0F52BA' }, // Sapphire
+                { bg: '#fef9c3', border: '#713f12', text: '#713f12' }, // Amber
+                { bg: '#e8edf8', border: '#0F52BA', text: '#1e3a8a' }, // Sapphire
                 { bg: '#f3e8ff', border: '#6b21a8', text: '#6b21a8' }, // Purple
-                { bg: '#ffedd5', border: '#c2410c', text: '#c2410c' }, // Orange
+                { bg: '#ffedd5', border: '#7c2d12', text: '#7c2d12' }, // Orange
                 { bg: '#fee2e2', border: '#991b1b', text: '#991b1b' }, // Red
-                { bg: '#ccfbf1', border: '#0f766e', text: '#0f766e' }, // Teal
+                { bg: '#ccfbf1', border: '#134e4a', text: '#134e4a' }, // Teal
             ];
             const fnt = { fontFamily: "'Anuphan', sans-serif" };
             const getDateLabel = (date) => {
@@ -4590,12 +4595,12 @@
                             </h2>
                             <div style={{ height: '3px', flex: 1, background: 'linear-gradient(90deg, #0F52BA, transparent)' }}></div>
                         </div>
-                        <div style={{ fontSize: '15px', color: '#374151', lineHeight: 1.4 }}>
+                        <div style={{ fontSize: '15px', color: '#1f2937', lineHeight: 1.4 }}>
                             <div>
                                 <b>{t.name}</b> {patientData.name} {patientData.lastName}
-                                <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
+                                <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
                                 <b>{t.hn}</b> {patientData.hn}
-                                <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
+                                <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
                                 <b>
                                     {type === 'opu' && inputs.protocol === 'Luteal stimulation'
                                         ? (language === 'th' ? 'วันที่ OPU / วันตกไข่ (Day 1):' : 'Date of OPU / Ovulation (Day 1):')
@@ -4603,31 +4608,31 @@
                                 </b> {type === 'opu' && inputs.protocol === 'Luteal stimulation' ? formatDate(inputs.ovulationDate) : formatDate(patientData.lmp)}
                                 {patientData.pmp && (
                                     <span>
-                                        <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
                                         <b>{t.pmp}</b> {formatDate(patientData.pmp)}
                                     </span>
                                 )}
                                 {patientData.cycleLength && (
                                     <span>
-                                        <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
                                         <b>{t.cycleLength}</b> {patientData.cycleLength} {language === 'th' ? 'วัน' : 'days'}
                                     </span>
                                 )}
                                 {inputs.protocol && (
                                     <span>
-                                        <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
                                         <b>{t.protocol}</b> {inputs.protocol}
                                     </span>
                                 )}
                                 {type === 'opu' && inputs.pgta !== undefined && (
                                     <span>
-                                        <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
                                         <b>{t.pgta}</b> {inputs.pgta ? t.yes : t.no}
                                     </span>
                                 )}
                                 {type === 'opu' && inputs.planForEmbryoTransfer !== undefined && (
                                     <span>
-                                        <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
+                                        <span style={{ margin: '0 8px', color: '#9ca3af' }}>|</span>
                                         <b>{t.planForEmbryoTransfer}</b> {inputs.planForEmbryoTransfer ? t.fresh : t.frozen}
                                     </span>
                                 )}
@@ -4652,7 +4657,7 @@
                                     padding: '4px 2px',
                                     fontSize: px(fsWeekday),
                                     fontWeight: 800,
-                                    color: i === 0 ? '#e0115f' : '#151667',
+                                    color: i === 0 ? '#9f1239' : '#151667',
                                     textAlign: 'center',
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden'
@@ -4674,18 +4679,21 @@
 
                                     {/* 1) Cell backgrounds and borders (span the whole week row) */}
                                     {wkData.days.map((c, di) => {
-                                        const base = { gridColumn: di + 1, gridRow: '1 / -1', boxSizing: 'border-box', position: 'relative', borderBottom: '1px solid #e5e7eb' };
+                                        const base = { gridColumn: di + 1, gridRow: '1 / -1', boxSizing: 'border-box', position: 'relative', borderBottom: `1px solid ${GRID_LINE}` };
                                         if (!c || c.empty) {
-                                            return <div key={`bg-${di}`} style={{ ...base, borderRight: di < 6 ? '1px solid #e5e7eb' : 'none', background: '#fafafa' }}></div>;
+                                            return <div key={`bg-${di}`} style={{ ...base, borderRight: di < 6 ? `1px solid ${GRID_LINE}` : 'none', background: '#fafafa' }}></div>;
                                         }
                                         const hv = !!c.vis;
                                         const isLab = c.vis && (c.vis.id === 'opu-v5' || c.vis.id === 'fet-v6' || c.vis.id === 'duo-p2-v5' || c.vis.id === 'opu-v-et');
-                                        const borderColor = c.isSun ? '#f5a3c0' : hv ? '#0F52BA' : '#a3b8e8';
                                         const bgColor = c.isSun ? '#fdf0f4' : isLab ? '#e6f5ef' : hv ? '#e8edf8' : '#ffffff';
+                                        // Visit days get a full 2px outline drawn inside the cell, so they still stand
+                                        // out on a black-and-white print where the tinted background disappears.
+                                        // Lab days use their own green box instead.
+                                        const outline = hv && !isLab ? 'inset 0 0 0 2px #0F52BA' : undefined;
                                         return (
-                                            <div key={`bg-${di}`} style={{ ...base, borderRight: di < 6 ? `1px solid ${borderColor}` : 'none', borderTop: hv ? `2px solid ${borderColor}` : 'none', background: bgColor }}>
+                                            <div key={`bg-${di}`} style={{ ...base, borderRight: di < 6 ? `1px solid ${GRID_LINE}` : 'none', background: bgColor, boxShadow: outline }}>
                                                 {isLab && (
-                                                    <div style={{ position: 'absolute', top: '3px', left: '3px', right: '3px', bottom: '3px', border: '2.5px solid #009473', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' }}></div>
+                                                    <div style={{ position: 'absolute', top: '3px', left: '3px', right: '3px', bottom: '3px', border: '3px solid #065f46', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' }}></div>
                                                 )}
                                             </div>
                                         );
@@ -4698,7 +4706,7 @@
                                         const hv = !c.empty && !!c.vis;
                                         const isM = hv && c.vis.id.endsWith('-v1');
                                         const isLab = hv && (c.vis.id === 'opu-v5' || c.vis.id === 'fet-v6' || c.vis.id === 'duo-p2-v5' || c.vis.id === 'opu-v-et');
-                                        const accent = isLab ? '#009473' : '#151667';
+                                        const accent = isLab ? '#065f46' : '#151667';
                                         return (
                                             <div key={`ct-${di}`} style={{ gridColumn: di + 1, gridRow: 1, position: 'relative', zIndex: 2, minWidth: 0, padding: isLab ? `${px(8)} ${px(isMobile ? 7 : 9)} ${px(4)}` : `${px(5)} ${px(isMobile ? 3 : 5)} ${px(3)}`, textAlign: 'left' }}>
                                                 {/* Date (right) and cycle day (left); the cycle day wraps below if both do not fit */}
@@ -4707,7 +4715,7 @@
                                                         {getDateLabel(c.dt)}
                                                     </div>
                                                     {!c.empty && (
-                                                        <div style={{ fontSize: px(fsCd), fontWeight: 700, color: isLab ? '#009473' : '#9ca3af', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                                                        <div style={{ fontSize: px(fsCd), fontWeight: 700, color: isLab ? '#065f46' : '#374151', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
                                                             {t.day} {c.cd}
                                                         </div>
                                                     )}
@@ -4715,11 +4723,11 @@
 
                                                 {hv && (
                                                     <div style={{ marginTop: px(4), overflowWrap: 'break-word', hyphens: 'auto', WebkitHyphens: 'auto' }}>
-                                                        <div style={{ fontSize: px(fsVisit), fontWeight: 900, color: isM ? '#e0115f' : accent, lineHeight: 1.15 }}>
+                                                        <div style={{ fontSize: px(fsVisit), fontWeight: 900, color: isM ? '#9f1239' : accent, lineHeight: 1.15 }}>
                                                             <span style={{ fontSize: '0.85em', marginRight: '2px' }}>{isM ? '🔴' : isLab ? '🔬' : '⭐'}</span>{'\u200B'}{visitLabel(c.vis.label)}
                                                         </div>
                                                         {!isM && c.vis.details && c.vis.details.map((dd, idx) => (
-                                                            <div key={idx} style={{ fontSize: px(fsDetail), color: isLab ? '#065f46' : '#374151', fontWeight: isLab ? 800 : 600, lineHeight: 1.15, marginTop: px(2) }}>
+                                                            <div key={idx} style={{ fontSize: px(fsDetail), color: isLab ? '#065f46' : '#1f2937', fontWeight: isLab ? 800 : 600, lineHeight: 1.15, marginTop: px(2) }}>
                                                                 {cleanDetail(dd)}
                                                             </div>
                                                         ))}
@@ -4729,7 +4737,7 @@
                                                 {c.hasTrigger && (
                                                     <div style={{
                                                         marginTop: px(5),
-                                                        backgroundColor: '#009473',
+                                                        backgroundColor: '#065f46',
                                                         borderLeft: `4px solid #f59e0b`,
                                                         color: '#ffffff',
                                                         padding: `${px(4)} ${px(6)}`,
@@ -4785,6 +4793,7 @@
                                                 minWidth: 0,
                                                 margin: `0 ${px(4)} ${px(2)}`,
                                                 backgroundColor: colorObj.bg,
+                                                border: `1px solid ${colorObj.border}`,
                                                 borderLeft: `4px solid ${colorObj.border}`,
                                                 color: colorObj.text,
                                                 padding: `${px(1)} ${px(6)}`,
@@ -4810,17 +4819,17 @@
                     {/* Footer Section (Restored & Integrated) */}
                     <div style={{
                         padding: '6px 24px 8px',
-                        borderTop: '1px solid #e5e7eb',
+                        borderTop: '1px solid #9ca3af',
                         marginTop: 'auto',
                         background: '#fafafa',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '4px'
                     }}>
-                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>
+                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#374151', fontStyle: 'italic' }}>
                             {language === 'th' ? t.cycleNoteTh : t.cycleNoteEn}
                         </div>
-                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
+                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#374151', fontStyle: 'italic', marginTop: '4px' }}>
                             <div>{t.disclaimerEn}</div>
                             <div>{t.disclaimerTh}</div>
                         </div>
@@ -4888,21 +4897,21 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                         <h2 style={{ fontSize: visitCount <= 4 ? '18px' : '16px', fontWeight: 800, color: '#151667', margin: '0 0 4px' }}>
                             {t.medicationOrders || 'Medication / Treatment Orders'}
                         </h2>
-                        <div style={{ fontSize: '10px', color: '#374151' }}>
+                        <div style={{ fontSize: '10px', color: '#1f2937' }}>
                             <b>{t.name}</b> {patientData.name} {patientData.lastName}
-                            <span style={{ margin: '0 6px', color: '#d1d5db' }}>|</span>
+                            <span style={{ margin: '0 6px', color: '#9ca3af' }}>|</span>
                             <b>{t.hn}</b> {patientData.hn}
-                            <span style={{ margin: '0 6px', color: '#d1d5db' }}>|</span>
+                            <span style={{ margin: '0 6px', color: '#9ca3af' }}>|</span>
                             {applied.title}
                             {type === 'opu' && inputs.pgta !== undefined && (
                                 <span>
-                                    <span style={{ margin: '0 6px', color: '#d1d5db' }}>|</span>
+                                    <span style={{ margin: '0 6px', color: '#9ca3af' }}>|</span>
                                     <b>{t.pgta}</b> {inputs.pgta ? t.yes : t.no}
                                 </span>
                             )}
                             {type === 'opu' && inputs.planForEmbryoTransfer !== undefined && (
                                 <span>
-                                    <span style={{ margin: '0 6px', color: '#d1d5db' }}>|</span>
+                                    <span style={{ margin: '0 6px', color: '#9ca3af' }}>|</span>
                                     <b>{t.planForEmbryoTransfer}</b> {inputs.planForEmbryoTransfer ? t.fresh : t.frozen}
                                 </span>
                             )}
@@ -4937,24 +4946,24 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                             const dateStr = `${v.label} — ${dow} ${formatDate(dt)}`;
                                             return (
                                                 <tr key={v.id}>
-                                                    <td style={{ border: '1.5px solid #cbd5e1', padding: cellPad, fontWeight: 'bold', color: '#151667' }}>
+                                                    <td style={{ border: '1.5px solid #4b5563', padding: cellPad, fontWeight: 'bold', color: '#151667' }}>
                                                         {dateStr}
                                                     </td>
                                                     <td
                                                         onClick={() => handleFieldClick && handleFieldClick(v.id, 'et_mm', edits[v.id]?.et_mm, language === 'th' ? 'เยื่อบุโพรงมดลูก (mm)' : 'Endometrium (mm)', '')}
-                                                        style={{ border: '1.5px solid #cbd5e1', padding: cellPad, textAlign: 'center', cursor: 'pointer', backgroundColor: '#fcfdfd', fontWeight: 'bold' }}
+                                                        style={{ border: '1.5px solid #4b5563', padding: cellPad, textAlign: 'center', cursor: 'pointer', backgroundColor: '#ffffff', fontWeight: 'bold' }}
                                                     >
                                                         {edits[v.id]?.et_mm || ''}
                                                     </td>
                                                     <td
                                                         onClick={() => handleFieldClick && handleFieldClick(v.id, 'rt_ovary', edits[v.id]?.rt_ovary, language === 'th' ? 'รังไข่ขวา (ขนาดฟองไข่)' : 'Rt ovary (follicles)', '')}
-                                                        style={{ border: '1.5px solid #cbd5e1', padding: cellPad, textAlign: 'center', cursor: 'pointer', backgroundColor: '#fcfdfd' }}
+                                                        style={{ border: '1.5px solid #4b5563', padding: cellPad, textAlign: 'center', cursor: 'pointer', backgroundColor: '#ffffff' }}
                                                     >
                                                         {edits[v.id]?.rt_ovary || ''}
                                                     </td>
                                                     <td
                                                         onClick={() => handleFieldClick && handleFieldClick(v.id, 'lt_ovary', edits[v.id]?.lt_ovary, language === 'th' ? 'รังไข่ซ้าย (ขนาดฟองไข่)' : 'Lt ovary (follicles)', '')}
-                                                        style={{ border: '1.5px solid #cbd5e1', padding: cellPad, textAlign: 'center', cursor: 'pointer', backgroundColor: '#fcfdfd' }}
+                                                        style={{ border: '1.5px solid #4b5563', padding: cellPad, textAlign: 'center', cursor: 'pointer', backgroundColor: '#ffffff' }}
                                                     >
                                                         {edits[v.id]?.lt_ovary || ''}
                                                     </td>
@@ -4971,7 +4980,7 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
 
                             return (
                                 <div key={v.id} style={{
-                                    border: '1.5px solid #c7d2fe',
+                                    border: '1.5px solid #374151',
                                     borderRadius: '5px',
                                     marginBottom: cardMargin,
                                     overflow: 'hidden',
@@ -4980,15 +4989,15 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                     <div style={{
                                         background: 'linear-gradient(135deg, #e8edf8, #d0daf0)',
                                         padding: '4px 10px',
-                                        borderBottom: '1px solid #c7d2fe',
+                                        borderBottom: '1px solid #374151',
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
                                     }}>
-                                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0F52BA' }}>
+                                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#151667' }}>
                                             {v.label} — {t.day} {v.day}
                                         </span>
-                                        <span style={{ fontSize: '10px', color: '#4b5563' }}>
+                                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#1f2937' }}>
                                             {dow} {formatDate(dt)}
                                         </span>
                                     </div>
@@ -4997,7 +5006,7 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                     <div style={{ padding: cardPadding + ' 10px' }}>
                                         {/* Visit details */}
                                         {v.details && v.details.length > 0 && (
-                                            <div style={{ marginBottom: '3px', fontSize: '9px', color: '#6b7280' }}>
+                                            <div style={{ marginBottom: '3px', fontSize: '9px', color: '#1f2937' }}>
                                                 {v.details.map((d, i) => (
                                                     <span key={i}>
                                                         {typeof d === 'string' ? d.replace(/_{3,}/g, '') : d}
@@ -5010,7 +5019,7 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                         {/* Auto-populated medications */}
                                         {v.startingMeds.length > 0 && (
                                             <div style={{ marginBottom: '4px' }}>
-                                                <div style={{ fontSize: '9px', fontWeight: 700, color: '#6b7280', marginBottom: '2px' }}>
+                                                <div style={{ fontSize: '9px', fontWeight: 700, color: '#1f2937', marginBottom: '2px' }}>
                                                     Rx:
                                                 </div>
                                                 {v.startingMeds.map(m => {
@@ -5023,20 +5032,20 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                                         ? `เริ่ม: วันที่ ${m.startDay} (${medStartDow} ${formatDate(medStartDt)})`
                                                         : `Starts: Day ${m.startDay} (${medStartDow} ${formatDate(medStartDt)})`;
                                                     return (
-                                                        <div key={m.id} style={{ fontSize: cardFs, color: '#374151', marginBottom: compact ? '2px' : '4px' }}>
+                                                        <div key={m.id} style={{ fontSize: cardFs, color: '#1f2937', marginBottom: compact ? '2px' : '4px' }}>
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
                                                                 <span>
-                                                                    <span style={{ color: '#0F52BA', fontWeight: 700 }}>{'\u2022'} {medName}</span>
+                                                                    <span style={{ color: '#151667', fontWeight: 700 }}>{'\u2022'} {medName}</span>
                                                                     {compact && doseSummary && (
-                                                                        <span style={{ color: '#6b7280' }}>{': '}{doseSummary}</span>
+                                                                        <span style={{ color: '#1f2937', fontWeight: 600 }}>{': '}{doseSummary}</span>
                                                                     )}
                                                                 </span>
-                                                                <span style={{ flexShrink: 0, fontSize: compact ? '9px' : '9.5px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: compact ? '1px 5px' : '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0', fontFamily: "'Anuphan', sans-serif" }}>
+                                                                <span style={{ flexShrink: 0, fontSize: compact ? '9px' : '9.5px', fontWeight: 700, color: '#065f46', backgroundColor: '#ecfdf5', padding: compact ? '1px 5px' : '2px 6px', borderRadius: '4px', border: '1px solid #065f46', fontFamily: "'Anuphan', sans-serif" }}>
                                                                     {medStartText}
                                                                 </span>
                                                             </div>
                                                             {!compact && doseSummary && (
-                                                                <div style={{ color: '#6b7280', paddingLeft: '8px', marginTop: '2px', whiteSpace: 'pre-line' }}>{doseSummary}</div>
+                                                                <div style={{ color: '#1f2937', fontWeight: 600, paddingLeft: '8px', marginTop: '2px', whiteSpace: 'pre-line' }}>{doseSummary}</div>
                                                             )}
                                                         </div>
                                                     );
@@ -5045,9 +5054,9 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                         )}
 
                                         {/* Blank lines for additional orders */}
-                                        <div style={{ borderBottom: '1px dotted #cbd5e1', height: blankLineH, marginBottom: '3px' }}></div>
+                                        <div style={{ borderBottom: '1px solid #4b5563', height: blankLineH, marginBottom: '3px' }}></div>
                                         {visitCount <= 4 && (
-                                            <div style={{ borderBottom: '1px dotted #cbd5e1', height: blankLineH, marginBottom: '6px' }}></div>
+                                            <div style={{ borderBottom: '1px solid #4b5563', height: blankLineH, marginBottom: '6px' }}></div>
                                         )}
                                     </div>
 
@@ -5057,13 +5066,13 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                             padding: '2px 10px 3px',
                                             display: 'flex',
                                             justifyContent: 'space-between',
-                                            borderTop: '1px solid #f1f5f9',
+                                            borderTop: '1px solid #9ca3af',
                                             fontSize: '9px',
-                                            color: '#6b7280',
+                                            color: '#1f2937',
                                         }}>
                                             <span>{t.doctorSignature || 'Doctor'}: ________________</span>
                                             <span>{t.nurseSignature || 'Nurse'}: ________________</span>
-                                            <span style={{ color: '#374151', fontWeight: 'bold' }}>Next Appointment: ____________________</span>
+                                            <span style={{ color: '#111827', fontWeight: 'bold' }}>Next Appointment: ____________________</span>
                                         </div>
                                     ) : (
                                         <>
@@ -5071,9 +5080,9 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                                 padding: visitCount <= 4 ? '3px 10px 6px' : '2px 10px 4px',
                                                 display: 'flex',
                                                 justifyContent: 'space-between',
-                                                borderTop: '1px solid #f1f5f9',
+                                                borderTop: '1px solid #9ca3af',
                                                 fontSize: '9px',
-                                                color: '#6b7280',
+                                                color: '#1f2937',
                                             }}>
                                                 <span>{t.doctorSignature || 'Doctor'}: ________________________</span>
                                                 <span>{t.nurseSignature || 'Nurse'}: ________________________</span>
@@ -5081,7 +5090,7 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                                             <div style={{
                                                 padding: '0px 10px ' + (visitCount <= 4 ? '8px' : '4px'),
                                                 fontSize: '10px',
-                                                color: '#374151',
+                                                color: '#111827',
                                                 fontWeight: 'bold',
                                             }}>
                                                 Next Appointment: _________________________________________________
