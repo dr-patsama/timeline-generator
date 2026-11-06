@@ -490,7 +490,7 @@
                 dose: 'Dose:',
                 medication: 'Medication:',
                 projectedStimulationDays: 'Projected stimulation length (days) – Elonva only',
-                afterElonvaPlan: 'If Elonva & projected > 8 days: select gonadotropins from Day 9 onward',
+                afterElonvaPlan: 'If Elonva & projected > 7 days: select gonadotropins from Day 8 onward',
                 go: 'Generate Timeline',
                 reset: 'Reset All',
                 back: 'Back to Input',
@@ -648,7 +648,7 @@
                 dose: 'ขนาดยา:',
                 medication: 'ยา:',
                 projectedStimulationDays: 'คาดการณ์จำนวนวันกระตุ้น (สำหรับ Elonva)',
-                afterElonvaPlan: 'ถ้าใช้ Elonva และคาดการณ์ > 8 วัน: เลือกยากระตุ้นไข่ตั้งแต่วันที่ 9 เป็นต้นไป',
+                afterElonvaPlan: 'ถ้าใช้ Elonva และคาดการณ์ > 7 วัน: เลือกยากระตุ้นไข่ตั้งแต่วันที่ 8 เป็นต้นไป',
                 go: 'สร้างไทม์ไลน์',
                 reset: 'รีเซ็ตทั้งหมด',
                 back: 'กลับไปยังหน้าป้อนข้อมูล',
@@ -2929,8 +2929,8 @@
 
                     // Explicitly link Post-Elonva start and Elonva end to Elonva start dynamically
                     if (inputs.gonadotropinMedication === 'Elonva') {
-                        // Elonva lasts 7 days (24 hours x 7), covering through Day Start+7. End Day is Start+7.
-                        const elonvaEnd = actualStart + 7;
+                        // Elonva covers 7 days: Start ... Start+6 (Elonva Day 1-7). End Day is Start+6.
+                        const elonvaEnd = actualStart + 6;
 
                         // Override Elonva bar end day dynamically
                         medOverrides['opu-m-gnd'] = {
@@ -2939,7 +2939,7 @@
                             end: elonvaEnd
                         };
 
-                        // Daily injection starts on the day after Elonva coverage ends (Start+8)
+                        // Daily injection starts on Elonva Day 8 = Start+7 (e.g. Elonva 21 Nov -> daily 28 Nov)
                         medOverrides['opu-m-post-elonva'] = {
                             ...(medOverrides['opu-m-post-elonva'] || {}),
                             start: elonvaEnd + 1
@@ -5270,8 +5270,8 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                     // Determine unit based on medication name
                     const unit = (gMed === 'Elonva' || gMed === 'Rekovelle') ? 'mcg' : 'IU';
 
-                    // Elonva lasts 7 days (24 hours x 7), covering through Day Start+7
-                    const endDay = gMed === 'Elonva' ? gStart + 7 : triggerDay - 1;
+                    // Elonva covers 7 days (Elonva Day 1-7), ending on Start+6
+                    const endDay = gMed === 'Elonva' ? gStart + 6 : triggerDay - 1;
 
                     medicationBars.push({
                         id: 'opu-m-gnd',
@@ -5297,7 +5297,7 @@ function OrdersPage({ type, patientData, inputs, applied, t, language, lmpDate, 
                     medicationBars.push({
                         id: 'opu-m-post-elonva',
                         shortName: 'Post-Elonva',
-                        startDay: gStart + 8,
+                        startDay: gStart + 7,
                         endDay: triggerDay - 1,
                         label: `${pMed}\n${pDose} ${pUnit}${pSc}`.trim(),
                         color: '#d1fae5',
