@@ -15,6 +15,8 @@
 - [x] FET: Visit 3 stays on its cycle day; progesterone (and ET) start the day after Visit 3 — completed 2026-09-27
 - [x] Calendar readable on phones: patient JPG uses a phone layout; A4 calendar text larger with no overlap — completed 2026-09-27
 
+- [x] OPU + Elonva: daily gonadotropin starts on Elonva Day 8 (Start+7, e.g. Elonva 21 Nov → daily 28 Nov); Elonva bar covers Day 1–7 — completed 2026-11-06
+
 ## Someday / Ideas
 
 - Consider adding Letrozole co-treatment option for Luteal stimulation protocol
